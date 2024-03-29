@@ -14,8 +14,7 @@ EXP_NAME=text_to_img_coco_image
 MODEL_NAME=cm3v21_109m_sft
 TASK=coco_image.0_shot
 BASEBASE_DIR=/fsx-checkpoints/yejinlee/sweep/txt_to_img/${TASK}.${MODEL_NAME}/bs${BATCH_SIZE}
-LOG_FILE=${BASEBASE_DIR=/fsx-checkpoints/yejinlee/sweep/txt_to_img/${TASK}.${MODEL_NAME}/bs${BATCH_SIZE}
-}/sweep.txt
+LOG_FILE=${BASEBASE_DIR}/sweep.txt
 
 CFG=6
 TEMP=1.0
