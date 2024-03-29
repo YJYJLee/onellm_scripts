@@ -404,12 +404,20 @@ def graph_gpu_kernel_breakdown_idle(kernel_breakdown, save_folder_path):
         elif "t2i" in folder_name_split[-2]:
             plt.ylim(0,1400)
     else:
-        if "i2t" in folder_name_split[-2]:
-            plt.ylim(0,5500)
-        elif "it2t" in folder_name_split[-2]:
-            plt.ylim(0,5500)
-        elif "t2i" in folder_name_split[-2]:
-            plt.ylim(0,1000)
+        if "bs4" in args.json_file:
+            if "i2t" in folder_name_split[-2]:
+                plt.ylim(0,1400)
+            elif "it2t" in folder_name_split[-2]:
+                plt.ylim(0,1400)
+            elif "t2i" in folder_name_split[-2]:
+                plt.ylim(0,1000)
+        elif "bs16" in args.json_file:
+            if "i2t" in folder_name_split[-2]:
+                plt.ylim(0,5500)
+            elif "it2t" in folder_name_split[-2]:
+                plt.ylim(0,5500)
+            elif "t2i" in folder_name_split[-2]:
+                plt.ylim(0,1000)
 
     plt.grid(lw=0.2)
     ax.set_axisbelow(True)
