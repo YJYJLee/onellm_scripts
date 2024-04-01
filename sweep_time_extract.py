@@ -98,12 +98,6 @@ for r in TOME_R:
             score_result.append(clip_score)
             print(merge_time,  " ", run_time)
 
-
-# %%
-print(len(xaxis))
-assert len(xaxis) == len(time_result["Merge"]) and len(time_result["Merge"]) == len(time_result["Other"])
-fig, ax = plt.subplots(figsize=[25.6, 4.8])
-
 xaxis.insert(0, "Xformer Original")
 score_result.insert(0, baseline_clip_score)
 time_result["Other"].insert(0, xformer_baseline_time)
@@ -114,6 +108,12 @@ time_result["Merge"].insert(0, 0)
 # score_result.insert(0, baseline_clip_score)
 # time_result["Other"].insert(0, baseline_time)
 # time_result["Merge"].insert(0, 0)
+
+
+# %%
+print(len(xaxis))
+assert len(xaxis) == len(time_result["Merge"]) and len(time_result["Merge"]) == len(time_result["Other"])
+fig, ax = plt.subplots(figsize=[25.6, 4.8])
 
 # Creating plot
 ax.bar(xaxis, time_result["Other"], label="Other")
@@ -132,7 +132,8 @@ ax.legend(loc="lower right")
 ax2.legend(loc="lower left")
 
 
-plt.title(BASE_DIR.split("/")[-1]+ "bs."+str(BATCH_SIZE)+' ToMe Breakdown (ms) & Clip Score Drop')
+# plt.title(BASE_DIR.split("/")[-1]+ "bs."+str(BATCH_SIZE)+' ToMe Breakdown (ms) & Clip Score Drop')
+plt.title('.'.join(BASE_DIR.split("/")[-2:])+' ToMe Breakdown (ms) & Clip Score Drop')
 plt.grid()
 
 # Show plot
