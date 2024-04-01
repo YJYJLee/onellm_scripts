@@ -74,7 +74,7 @@ do
                     FSD=/fsx-onellm/mingdachen/onellm-eval-data-tok python scripts/cm3v2/gen_images.py --exp_name $EXP_NAME \
                         --model-name $MODEL_NAME --batch-size $NUM_SAMPLE --tasks $TASK \
                         --exp_dir $BASE_DIR --cfg $CFG --temp $TEMP --topp $TOPP --seed $SEED --num-cfg-samples $BATCH_SIZE --generate \
-                        --tome True --tome_layer $j --tome_r $i --tome_num_tok $k $tome_measure_flag> $BASE_DIR/time.txt
+                        --tome True --tome_layer $j --tome_r $i --tome_num_tok $k $tome_measure_flag > $BASE_DIR/time.txt
                     echo "`date` [Generation] Finished!!! ${BASE_DIR}" >> $LOG_FILE
                 fi
 

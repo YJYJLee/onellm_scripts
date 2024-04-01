@@ -59,10 +59,12 @@ xaxis = list()
 time_result = {"Merge": list(), "Other": list()}
 score_result = list()
 
-BASE_DIR="/fsx-checkpoints/yejinlee/sweep/txt_to_img/coco_image.0_shot.cm3v21_109m_sft"
-time_file_path=BASE_DIR+"/bs"+str(BATCH_SIZE)+"/original/time.txt"
+
+BASE_DIR="/fsx-checkpoints/yejinlee/sweep/txt_to_img/retrieval/coco_image.0_shot.default_retrieval_template.cm3v21_109m_sft/bs16.n_retrieved_doc3"
+# BASE_DIR="/fsx-checkpoints/yejinlee/sweep/txt_to_img/coco_image.0_shot.cm3v21_109m_sft/bs"+str(BATCH_SIZE)
+time_file_path=BASE_DIR+"/original/time.txt"
 xformer_baseline_time = np.average(extract_time(time_file_path))
-score_file_path=BASE_DIR+"/bs"+str(BATCH_SIZE)+"/original/score.txt"
+score_file_path=BASE_DIR+"/original/score.txt"
 baseline_clip_score, baseline_pick_score = extract_score(score_file_path)
 print("Baseline time: ", xformer_baseline_time)
 print("Baseline clip score: ", baseline_clip_score)
@@ -74,11 +76,11 @@ for r in TOME_R:
             clip_score = -1
             pick_score = -1
             for m in TOME_MERGE_TIME:
-                time_file_path=BASE_DIR+"/bs"+str(BATCH_SIZE)+"/r_"+str(r)+"_layer_"+str(l).replace(" ", "")+"_num_tok_"+str(nt)+"_merge_time_"+m+"/time.txt"
+                time_file_path=BASE_DIR+"/r_"+str(r)+"_layer_"+str(l).replace(" ", "")+"_num_tok_"+str(nt)+"_merge_time_"+m+"/time.txt"
                 time[m] = extract_time(time_file_path)                    
                 
                 if m == "False":
-                    score_file_path=BASE_DIR+"/bs"+str(BATCH_SIZE)+"/r_"+str(r)+"_layer_"+str(l).replace(" ", "")+"_num_tok_"+str(nt)+"_merge_time_"+m+"/score.txt"
+                    score_file_path=BASE_DIR+"/r_"+str(r)+"_layer_"+str(l).replace(" ", "")+"_num_tok_"+str(nt)+"_merge_time_"+m+"/score.txt"
                     clip_score, pick_score = extract_score(score_file_path)
   
             if len(time["True"])==0 and len(time["False"]) == 0:
