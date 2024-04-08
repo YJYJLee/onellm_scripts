@@ -51,7 +51,7 @@ def extract_score(score_file_path):
             # pick_score = np.mean(get_score[5:])
             return get_score[0], get_score[1]   # clip score, pick score
     else:
-        print("File doesn't exist: " + time_file_path)
+        print("File doesn't exist: " + score_file_path)
         # break
     return -1, -1
 
