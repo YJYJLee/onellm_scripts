@@ -275,6 +275,10 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
         print(key, " = ", value)
     print("end")
     
+    kernel_breakdown["Linear"] = [a+b for a,b in zip(kernel_breakdown["MODULE_ColumnParallelLinear_AG"], kernel_breakdown["MODULE_RowParallelLinear_AG"])]
+    del kernel_breakdown["MODULE_ColumnParallelLinear_AG"]
+    del kernel_breakdown["MODULE_RowParallelLinear_AG"]
+
     if "MODULE_ToMe_Merge_AG" in kernel_breakdown:
         kernel_breakdown["MODULE_ToMe_Merge_AG"] = [0]*(len(kernel_breakdown["Misc"])-len(kernel_breakdown["MODULE_ToMe_Merge_AG"])) + kernel_breakdown["MODULE_ToMe_Merge_AG"]
     if plot_graph:
@@ -294,7 +298,17 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
 ############################################################################################################################################
 ############################################################################################################################################
 
-
+colormap = colormaps['Set3'].colors
+cmap = {"MODULE_ParallelEmbedding_AG": colormap[0],
+    "Misc": colormap[1],
+    "MODULE_FusedRMSNorm_AG": colormap[2],
+    "Linear": colormap[3],
+    "MODULE_LayerNorm_AG": colormap[4],
+    "MODULE__InnerAttention_AG": colormap[5],
+    "Copy": colormap[7],
+    "MODULE_SCORING_AG": colormap[8],
+    "Idle": colormap[9]}
+    
 def prep_graph():
     print("GRAPHING")
 
@@ -318,13 +332,12 @@ def graph_gpu_kernel_breakdown(kernel_breakdown, save_folder_path):
 
     labels = list(kernel_breakdown.keys())
 
-    cmap = colormaps['Set3'].colors
     steps_len = len(kernel_breakdown["MODULE_SCORING_AG"])
     steps = np.arange(steps_len)
     bottom = [0]*steps_len
 
     for idx, (k, v) in enumerate(kernel_breakdown.items()):
-        ax.bar(steps, v, bottom = bottom, label=k, color=cmap[idx], width=0.8)
+        ax.bar(steps, v, bottom = bottom, label=k, color=cmap[k], width=0.8)
         bottom = np.add(bottom, v)
 
     ax.legend(fontsize=4)
@@ -376,13 +389,12 @@ def graph_gpu_kernel_breakdown_idle(kernel_breakdown, save_folder_path):
 
     labels = list(kernel_breakdown.keys())
 
-    cmap = colormaps['Set3'].colors
     steps_len = len(kernel_breakdown["MODULE_SCORING_AG"])
     steps = np.arange(steps_len)
     bottom = [0]*steps_len
 
     for idx, (k, v) in enumerate(kernel_breakdown.items()):
-        ax.bar(steps, v, bottom = bottom, label=k, color=cmap[idx], width=0.8)
+        ax.bar(steps, v, bottom = bottom, label=k, color=cmap[k], width=0.8)
         bottom = np.add(bottom, v)
 
     ax.legend(fontsize=4)
@@ -432,8 +444,6 @@ def graph_gpu_kernel_breakdown_idle(kernel_breakdown, save_folder_path):
 def graph_decoding_time(decoding_step_time, save_folder_path):
     fig, ax, dpi = prep_graph()
 
-    cmap = colormaps['Set3'].colors
-
     plt.bar(np.arange(len(decoding_step_time)), decoding_step_time, color=cmap[2], width = 0.8)
 
     folder_name_split = args.json_file.split("/")
@@ -468,8 +478,6 @@ def graph_overall(kernel_breakdown, xlabel, exp_name, save_folder_path):
 
     labels = list(kernel_breakdown.keys())
 
-    cmap = colormaps['Set3'].colors
-
     steps_len = len(xlabel)
     # steps = np.arange(steps_len)
     bottom = [0]*steps_len
@@ -477,7 +485,7 @@ def graph_overall(kernel_breakdown, xlabel, exp_name, save_folder_path):
     # total_time = sum([v for v in kernel_breakdown.values()])
 
     for idx, (k, v) in enumerate(kernel_breakdown.items()):
-        ax.bar(xlabel, v, bottom = bottom, label=k, color=cmap[idx], width=0.8)
+        ax.bar(xlabel, v, bottom = bottom, label=k, color=cmap[k], width=0.8)
         bottom = np.add(bottom, v)
 
     ax.legend(fontsize=4)
@@ -508,8 +516,6 @@ def graph_overall_ratio(kernel_breakdown, xlabel, exp_name, save_folder_path):
     
     labels = list(kernel_breakdown.keys())
 
-    cmap = colormaps['Set3'].colors
-
     steps_len = len(xlabel)
     # steps = np.arange(steps_len)
     bottom = [0]*steps_len
@@ -519,7 +525,7 @@ def graph_overall_ratio(kernel_breakdown, xlabel, exp_name, save_folder_path):
         total_time.append(sum([v[i] for v in kernel_breakdown.values()]))
 
     for idx, (k, v) in enumerate(kernel_breakdown.items()):
-        ax.bar(xlabel, [vv/t*100 if t!=0 else 0 for vv, t in zip(v, total_time)], bottom = bottom, label=k, color=cmap[idx], width=0.8)
+        ax.bar(xlabel, [vv/t*100 if t!=0 else 0 for vv, t in zip(v, total_time)], bottom = bottom, label=k, color=cmap[k], width=0.8)
         bottom = np.add(bottom, [vv/t*100 if t!=0 else 0 for vv, t in zip(v, total_time)])
 
     ax.legend(fontsize=4)
@@ -555,24 +561,28 @@ if args.json_file.split("/")[-1] == "":
 if args.batch_size:
     assert "retrieval" not in args.json_file
     # Batch Iterate
-    BATCH_SIZE=["4", "8", "16", "32"]
+    BATCH_SIZE=["1", "4", "8", "16", "32"]
     overall_breakdown = dict()
     for bs in BATCH_SIZE:
         exp_info = args.json_file.split("/")[-1].split("bs")
         file_path = '/'.join(args.json_file.split("/")[:-1])+"/"+exp_info[0]+"bs"+bs+"."+'.'.join(exp_info[1].split(".")[1:])+"/profile.json"
         profile_result = parse_file(file_path, plot_graph=False)
-        if overall_breakdown == dict():
-            for k in profile_result.keys():
-                overall_breakdown[k] = list()
+        if profile_result != dict():
+            if overall_breakdown == dict():
+                for k in profile_result.keys():
+                    overall_breakdown[k] = list()
 
-        assert profile_result.keys() == overall_breakdown.keys()
-        for k, v in profile_result.items():
-            overall_breakdown[k].append(sum(v))
+            assert profile_result.keys() == overall_breakdown.keys()
+            for k, v in profile_result.items():
+                overall_breakdown[k].append(sum(v))
+        else:
+            for k, v in overall_breakdown.items():
+                overall_breakdown[k].append(0)
 
     folder_name_split = args.json_file.split("/")
     exp_info = folder_name_split[-1].split("bs")
-    save_folder_path = args.graph_path+"/"+(folder_name_split[-2] if "retrieval" in args.json_file else "batch_size_overall") + "/"+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
-    print(save_folder_path)
+    save_folder_path = args.graph_path+"/"+ ("wo_flashattn/" if "wo_flashattn" in args.json_file else "") + ("retrieval/" if "retrieval" in args.json_file else "batch_size_overall/")+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
+
     graph_overall(overall_breakdown, BATCH_SIZE, "batch_size", save_folder_path)
     graph_overall_ratio(overall_breakdown, BATCH_SIZE, "batch_size", save_folder_path)
 
@@ -584,17 +594,21 @@ elif args.n_retrieved_doc:
     overall_breakdown = dict()
     for nd in NRETRIEVED_DOCS:
         profile_result = parse_file(args.json_file+".n_retrieved_docs"+nd+"/profile.json", plot_graph=False)
-        if overall_breakdown == dict():
-            for k in profile_result.keys():
-                overall_breakdown[k] = list()
+        if profile_result != dict():
+            if overall_breakdown == dict():
+                for k in profile_result.keys():
+                    overall_breakdown[k] = list()
 
-        assert profile_result.keys() == overall_breakdown.keys()
-        for k, v in profile_result.items():
-            overall_breakdown[k].append(sum(v))
+            assert profile_result.keys() == overall_breakdown.keys()
+            for k, v in profile_result.items():
+                overall_breakdown[k].append(sum(v))
+        else:
+            for k, v in overall_breakdown.items():
+                overall_breakdown[k].append(0)
 
     folder_name_split = args.json_file.split("/")
     exp_info = folder_name_split[-1].split("bs")
-    save_folder_path = args.graph_path+"/"+(folder_name_split[-2] if "retrieval" in args.json_file else "batch_size_overall") + "/"+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
+    save_folder_path = args.graph_path+"/"+ ("wo_flashattn/" if "wo_flashattn" in args.json_file else "") + ("retrieval/" if "retrieval" in args.json_file else "batch_size_overall/")+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
 
     graph_overall(overall_breakdown, NRETRIEVED_DOCS, "n_retrieved_docs", save_folder_path)
     graph_overall_ratio(overall_breakdown, NRETRIEVED_DOCS, "n_retrieved_docs", save_folder_path)
@@ -603,26 +617,29 @@ elif args.both:
     assert "retrieval" in args.json_file
 
     # BATCH_SIZE and NRETRIEVED_DOCS Iterate
-    BATCH_SIZE=["bs4", "bs8", "bs16"]#, "bs32"]
+    BATCH_SIZE=["bs1", "bs4", "bs8", "bs16"]#, "bs32"]
     NRETRIEVED_DOCS=["n_retrieved_docs1", "n_retrieved_docs2", "n_retrieved_docs3", "n_retrieved_docs4"]
     overall_breakdown = dict()
     for bs in BATCH_SIZE:
         for nd in NRETRIEVED_DOCS:
             exp_info = args.json_file.split("/")[-1].split("bs")
             file_path = '/'.join(args.json_file.split("/")[:-1])+"/"+exp_info[0]+bs+"."+'.'.join(exp_info[1].split(".")[1:])+"."+nd+"/profile.json"
-
             profile_result = parse_file(file_path, plot_graph=False)
-            if overall_breakdown == dict():
-                for k in profile_result.keys():
-                    overall_breakdown[k] = list()
-            if profile_result != {}:
+            if profile_result != dict():
+                if overall_breakdown == dict():
+                    for k in profile_result.keys():
+                        overall_breakdown[k] = list()
+
                 assert profile_result.keys() == overall_breakdown.keys()
-            for k, v in overall_breakdown.items():
-                overall_breakdown[k].append(sum(profile_result[k]) if profile_result != {} else 0)
+                for k, v in profile_result.items():
+                    overall_breakdown[k].append(sum(v))
+            else:
+                for k, v in overall_breakdown.items():
+                    overall_breakdown[k].append(0)
 
     folder_name_split = args.json_file.split("/")
     exp_info = folder_name_split[-1].split("bs")
-    save_folder_path = args.graph_path+"/"+(folder_name_split[-2] if "retrieval" in args.json_file else "batch_size_overall") + "/"+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
+    save_folder_path = args.graph_path+"/"+ ("wo_flashattn/" if "wo_flashattn" in args.json_file else "") + ("retrieval/" if "retrieval" in args.json_file else "batch_size_overall/")+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
 
     graph_overall(overall_breakdown, ['.'.join(ip) for ip in list(itertools.product(BATCH_SIZE, NRETRIEVED_DOCS))], "batch_size&n_retrieved_docs", save_folder_path)
     graph_overall_ratio(overall_breakdown, ['.'.join(ip) for ip in list(itertools.product(BATCH_SIZE, NRETRIEVED_DOCS))], "batch_size&n_retrieved_docs", save_folder_path)
