@@ -36,7 +36,7 @@ elif "textvqa.0_shot.cm3v2_template" in args.profile_dir:
 elif "vizwiz.0_shot.cm3v2_template" in args.profile_dir:
     END=5
 
-def process_report(file_path):
+def process_report(file_path, filter_ps):
     report = ncu_report.load_report(file_path)
     mem = list()
     sm = list()
@@ -71,21 +71,17 @@ for profile_step in tqdm(range(0, END+1, PROFILE_GRANULARITY)):
         profile_steps += str(ps)+"."
         filter_ps.append(ps)
         xaxis.append("Decoding Step "+str(ps))
-    # for fs in filter_ps:
-    #     memory_bw_util.append(0)
-    #     sm_util.append(0)
-    # continue
 
     file_path = args.profile_dir+"/layer"+str(PROFILE_LAYER)+"/decoding_step"+profile_steps+"/ncu_memory_bw_profile.ncu-rep"
     
     if os.path.isfile(file_path):
-        mem, sm = process_report(file_path)
+        mem, sm = process_report(file_path, filter_ps)
         memory_bw_util += mem
         sm_util += sm
     else:
         file_path = args.profile_dir+"/layer"+str(PROFILE_LAYER)+"/decoding_step_"+profile_steps+"/ncu_memory_bw_profile.ncu-rep"
         if os.path.isfile(file_path):
-            mem, sm = process_report(file_path)
+            mem, sm = process_report(file_path, filter_ps)
             memory_bw_util += mem
             sm_util += sm
         else:
@@ -93,7 +89,7 @@ for profile_step in tqdm(range(0, END+1, PROFILE_GRANULARITY)):
                 # file_path = args.profile_dir+"/layer"+str(PROFILE_LAYER)+"/decoding_step_"+profile_steps+"/ncu_memory_bw_profile.ncu-rep"
                 file_path = re.sub(r'topp', 'topp.', re.sub(r'temp', 'temp.', re.sub(r'cfg', 'cfg.', args.profile_dir)))+"/layer"+str(PROFILE_LAYER)+"/decoding_step"+profile_steps+"/ncu_memory_bw_profile.ncu-rep"
                 if os.path.isfile(file_path):
-                    mem, sm = process_report(file_path)
+                    mem, sm = process_report(file_path, filter_ps)
                     memory_bw_util += mem
                     sm_util += sm
                 else:
