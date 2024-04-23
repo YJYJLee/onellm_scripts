@@ -1,5 +1,5 @@
 # Run profile
-MODELNAME="cm3v21_109m_sft"
+MODELNAME="cm3v21_sftv1_exp1_30b"
 BATCHSIZE=$1
 # Image to Text
 ## MSCOCO
