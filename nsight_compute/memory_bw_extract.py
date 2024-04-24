@@ -124,7 +124,7 @@ def plot_graph(xaxis, yaxis, title):
     # Show plot
     fig.tight_layout()
     fig.show()
-    save_file_path="/fsx-checkpoints/yejinlee/analysis_figures/"+"_".join(title.lower().split(" "))+"/"
+    save_file_path="/fsx-checkpoints/yejinlee/analysis_figures/"+ ("wo_efficient_attn/" if "wo_efficient_attn" in args.profile_dir else "") + "_".join(title.lower().split(" "))+"/"
     os.makedirs(save_file_path, exist_ok=True)
     save_file_path += args.profile_dir.split("/")[-1]+".png"
     print("Saving to ", save_file_path)

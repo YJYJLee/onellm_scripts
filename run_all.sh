@@ -141,3 +141,24 @@ for bs in "${BATCH_SIZE[@]}"
 do
     ./onellm_scripts/memory_bw_profile_graph_script.sh $bs
 done
+
+
+########################################################################################################################################################################
+########################################################################################################################################################################
+########################################################################################################################################################################
+
+
+# [w/o memory efficient attention] Run memory bw profile & SM utilization profile
+BATCH_SIZE=(1 4 8 16 32)
+for bs in "${BATCH_SIZE[@]}"
+do
+    ./onellm_scripts/memory_bw_profile.sh $bs
+done
+
+
+# [w/o memory efficient attention] Plot graph memory bw & SM utilization
+BATCH_SIZE=(1 4 8 16 32)
+for bs in "${BATCH_SIZE[@]}"
+do
+    ./onellm_scripts/memory_bw_profile_graph_script.sh $bs
+done
