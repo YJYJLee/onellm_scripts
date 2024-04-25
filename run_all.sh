@@ -131,7 +131,7 @@ done
 BATCH_SIZE=(1 4 8 16 32)
 for bs in "${BATCH_SIZE[@]}"
 do
-    ./onellm_scripts/memory_bw_profile.sh $bs
+    ./onellm_scripts/nsight_compute/w_efficient_attn_baseline/w_efficient_attn_memory_bw_profile.sh $bs
 done
 
 
@@ -139,7 +139,7 @@ done
 BATCH_SIZE=(1 4 8 16 32)
 for bs in "${BATCH_SIZE[@]}"
 do
-    ./onellm_scripts/memory_bw_profile_graph_script.sh $bs
+    ./onellm_scripts/nsight_compute/w_efficient_attn/w_efficient_attn_memory_bw_profile_graph_script.sh $bs
 done
 
 
@@ -152,7 +152,7 @@ done
 BATCH_SIZE=(1 4 8 16 32)
 for bs in "${BATCH_SIZE[@]}"
 do
-    ./onellm_scripts/memory_bw_profile.sh $bs
+    ./onellm_scripts/nsight_compute/wo_efficient_attn_baseline/wo_efficient_attn_memory_bw_profile.sh $bs
 done
 
 
@@ -160,5 +160,5 @@ done
 BATCH_SIZE=(1 4 8 16 32)
 for bs in "${BATCH_SIZE[@]}"
 do
-    ./onellm_scripts/memory_bw_profile_graph_script.sh $bs
+    ./onellm_scripts/nsight_compute/wo_efficient_attn/wo_efficient_attn_memory_bw_profile_graph_script.sh $bs
 done

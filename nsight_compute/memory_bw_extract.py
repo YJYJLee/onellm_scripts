@@ -20,7 +20,19 @@ parser.add_argument("--task", type=str, default="img_to_txt")
 parser.add_argument("--profile_dir", type=str, default="")
 args = parser.parse_args()
 
+batch_size=-1
+n_retrieved_docs=-1
+info_str=args.profile_dir.split("/")[-1].split(".")
+for info in info_str:
+    if "bs" in info:
+        batch_size = int(info.split("bs")[-1])
+    elif "n_retrieved_docs" in info:
+        n_retrieved_docs = int(info.split("n_retrieved_docs")[-1])
 
+assert batch_size!=-1
+print("Batch size: ", batch_size, " / n_retrieved_docs: ", n_retrieved_docs)
+
+END=-1
 if "coco.0_shot.cm3v2_template" in args.profile_dir:
     END=13
 elif "flickr30k.0_shot.cm3v2_template" in args.profile_dir:
@@ -35,7 +47,195 @@ elif "textvqa.0_shot.cm3v2_template" in args.profile_dir:
     END=8
 elif "vizwiz.0_shot.cm3v2_template" in args.profile_dir:
     END=5
+elif "coco.0_shot.flamingo_retrieval_v2_template" in args.profile_dir:
+    assert n_retrieved_docs != -1
+    if batch_size==1:
+        END=30
+    elif batch_size==4:
+        if n_retrieved_docs==1:
+            END=34
+        elif n_retrieved_docs==2:
+            END=49
+        elif n_retrieved_docs==3:
+            END=30
+        elif n_retrieved_docs==4:
+            END=30
+    elif batch_size==8:
+        if n_retrieved_docs==1:
+            END=34
+        elif n_retrieved_docs==2:
+            END=40
+        elif n_retrieved_docs==3:
+            END=30
+        elif n_retrieved_docs==4:
+            END=30
+    elif batch_size==16:
+        if n_retrieved_docs==1:
+            END=39
+        elif n_retrieved_docs==2:
+            END=45
+        elif n_retrieved_docs==3:
+            END=30
+        elif n_retrieved_docs==4:
+            END=30
+elif "flickr30k.0_shot.flamingo_retrieval_v2_template" in args.profile_dir:
+    assert n_retrieved_docs != -1
+    if batch_size==1:
+        if n_retrieved_docs==1:
+            END=30
+        elif n_retrieved_docs==2:
+            END=30
+        elif n_retrieved_docs==3:
+            END=30
+        elif n_retrieved_docs==4:
+            END=29
+    elif batch_size==4:
+        if n_retrieved_docs==1:
+            END=37
+        elif n_retrieved_docs==2:
+            END=46
+        elif n_retrieved_docs==3:
+            END=30
+        elif n_retrieved_docs==4:
+            END=30
+    elif batch_size==8:
+        if n_retrieved_docs==1:
+            END=38
+        elif n_retrieved_docs==2:
+            END=40
+        elif n_retrieved_docs==3:
+            END=30
+        elif n_retrieved_docs==4:
+            END=30
+    elif batch_size==16:
+        if n_retrieved_docs==1:
+            END=43
+        elif n_retrieved_docs==2:
+            END=52
+        elif n_retrieved_docs==3:
+            END=30
+        elif n_retrieved_docs==4:
+            END=30
+elif "coco_image.0_shot.default_retrieval_template" in args.profile_dir:
+    END=1023
+elif "partiprompts.0_shot.default_retrieval_template" in args.profile_dir:
+    END=1023
+elif "okvqa.0_shot.flamingo_retrieval_v2_template" in args.profile_dir:
+    assert n_retrieved_docs != -1
+    if batch_size==1:
+        if n_retrieved_docs==1:
+            END=10
+        elif n_retrieved_docs==2:
+            END=10
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+    elif batch_size==4:
+        if n_retrieved_docs==1:
+            END=18
+        elif n_retrieved_docs==2:
+            END=17
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+    elif batch_size==8:
+        if n_retrieved_docs==1:
+            END=19
+        elif n_retrieved_docs==2:
+            END=21
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+    elif batch_size==16:
+        if n_retrieved_docs==1:
+            END=21
+        elif n_retrieved_docs==2:
+            END=24
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+elif "textvqa.0_shot.flamingo_retrieval_v2_template" in args.profile_dir:
+    assert n_retrieved_docs != -1
+    if batch_size==1:
+        if n_retrieved_docs==1:
+            END=10
+        elif n_retrieved_docs==2:
+            END=10
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+    elif batch_size==4:
+        if n_retrieved_docs==1:
+            END=12
+        elif n_retrieved_docs==2:
+            END=20
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+    elif batch_size==8:
+        if n_retrieved_docs==1:
+            END=14
+        elif n_retrieved_docs==2:
+            END=22
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+    elif batch_size==16:
+        if n_retrieved_docs==1:
+            END=21
+        elif n_retrieved_docs==2:
+            END=32
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+elif "vizwiz.0_shot.flamingo_retrieval_v2_template" in args.profile_dir:
+    assert n_retrieved_docs != -1
+    if batch_size==1:
+        if n_retrieved_docs==1:
+            END=10
+        elif n_retrieved_docs==2:
+            END=10
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+    elif batch_size==4:
+        if n_retrieved_docs==1:
+            END=24
+        elif n_retrieved_docs==2:
+            END=18
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+    elif batch_size==8:
+        if n_retrieved_docs==1:
+            END=14
+        elif n_retrieved_docs==2:
+            END=19
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
+    elif batch_size==16:
+        if n_retrieved_docs==1:
+            END=21
+        elif n_retrieved_docs==2:
+            END=26
+        elif n_retrieved_docs==3:
+            END=10
+        elif n_retrieved_docs==4:
+            END=10
 
+print("END: ", END)
 def process_report(file_path, filter_ps):
     report = ncu_report.load_report(file_path)
     mem = list()
@@ -86,17 +286,22 @@ for profile_step in tqdm(range(0, END+1, PROFILE_GRANULARITY)):
             sm_util += sm
         else:
             if "cfg" in file_path:
-                # file_path = args.profile_dir+"/layer"+str(PROFILE_LAYER)+"/decoding_step_"+profile_steps+"/ncu_memory_bw_profile.ncu-rep"
                 file_path = re.sub(r'topp', 'topp.', re.sub(r'temp', 'temp.', re.sub(r'cfg', 'cfg.', args.profile_dir)))+"/layer"+str(PROFILE_LAYER)+"/decoding_step"+profile_steps+"/ncu_memory_bw_profile.ncu-rep"
                 if os.path.isfile(file_path):
                     mem, sm = process_report(file_path, filter_ps)
                     memory_bw_util += mem
                     sm_util += sm
                 else:
-                    print("File doesn't exist ", file_path)
-                    for fs in filter_ps:
-                        memory_bw_util.append(0)
-                        sm_util.append(0)
+                    file_path = re.sub(r'topp', 'topp.', re.sub(r'temp', 'temp.', re.sub(r'cfg', 'cfg.', args.profile_dir)))+"/layer"+str(PROFILE_LAYER)+"/decoding_step_"+profile_steps+"/ncu_memory_bw_profile.ncu-rep"
+                    if os.path.isfile(file_path):
+                        mem, sm = process_report(file_path, filter_ps)
+                        memory_bw_util += mem
+                        sm_util += sm
+                    else:
+                        print("File doesn't exist ", file_path)
+                        for fs in filter_ps:
+                            memory_bw_util.append(0)
+                            sm_util.append(0)
             else:
                 print("File doesn't exist ", file_path)
                 for fs in filter_ps:
