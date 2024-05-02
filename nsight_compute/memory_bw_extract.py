@@ -240,6 +240,7 @@ print("END: ", END)
 first = False
 num_stat = -1
 
+print("END: ", END)
 def process_report(file_path, filter_ps):
     report = ncu_report.load_report(file_path)
     mem = list()
