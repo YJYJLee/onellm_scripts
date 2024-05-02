@@ -18,6 +18,8 @@ import numpy as np
 from matplotlib.ticker import AutoMinorLocator, MultipleLocator, FuncFormatter
 from matplotlib.lines import Line2D
 from matplotlib import colormaps
+import re
+
 # Initialize ArgParser:
 parser = argparse.ArgumentParser("argparser")
 
@@ -311,7 +313,7 @@ cmap = {"MODULE_ParallelEmbedding_AG": colormap[0],
     "MODULE_SCORING_AG": colormap[8],
     "Idle": colormap[9]}
     
-def prep_graph():
+def prep_graph(nested=False):
     print("GRAPHING")
 
     figures_dir = '.'
@@ -324,14 +326,14 @@ def prep_graph():
 
     fig_width = (page_width - 2*lr_margin - column_separation)/2
     dbl_fig_width = page_width - 2*lr_margin
-    fig_height = 0.8 * fig_width
+    fig_height = 0.45 * fig_width if not nested else 0.8 * fig_width
     
     fig, ax = plt.subplots(1, figsize=(fig_width, fig_height), dpi=dpi, layout='tight')    # List of labels
     return fig, ax, dpi
 
-def wrapup_graph(plt, ax, exp_name, xlabel, yaxis_title, title, save_folder_path, filename, dpi, nexted_axis=False):
+def wrapup_graph(plt, ax, exp_name, xlabel, yaxis_title, title, save_folder_path, filename, dpi, nested=False):
     plt.ylabel(yaxis_title, fontsize=6)
-    plt.xlabel(("\n" if nexted_axis else "") + exp_name, fontsize=6)
+    plt.xlabel(("\n\n\n\n\n\n\n\n\n\n\n" if nested else "") + exp_name, fontsize=6)
     plt.title(title, fontsize=6)
 
     plt.xticks(fontsize=6)
@@ -399,7 +401,7 @@ def graph_gpu_kernel_breakdown(kernel_breakdown, save_folder_path):
 
     # folder_path = args.graph_path+"/"+folder_name_split[-2]
     os.makedirs(save_folder_path, exist_ok=True)
-    file_path = save_folder_path+"decoding_step_operator_breakdown.png"
+    file_path = save_folder_path+"decoding_step_operator_breakdown.pdf"
     print("graph_path = ", file_path)
     plt.savefig(file_path, dpi=dpi)
 
@@ -456,7 +458,7 @@ def graph_gpu_kernel_breakdown_idle(kernel_breakdown, save_folder_path):
 
     # folder_path = args.graph_path+"/"+folder_name_split[-2]
     os.makedirs(save_folder_path, exist_ok=True)
-    file_path = save_folder_path+"decoding_step_operator_breakdown_idle.png"
+    file_path = save_folder_path+"decoding_step_operator_breakdown_idle.pdf"
     print("graph_path = ", file_path)
     plt.savefig(file_path, dpi=dpi)
 
@@ -493,12 +495,12 @@ def graph_overall(kernel_breakdown, xlabel, exp_name, save_folder_path):
 
     # # folder_path = args.graph_path+"/"+"/".join(folder_name_split[-2:])
     # # folder_path = args.graph_path+"/"+ ("/".join(folder_name_split[-2:]) if "retrieval" in folder_name_split else folder_name_split[-1])
-    # file_path = save_folder_path+exp_name+"_decoding_step_operator_breakdown_overall.png"
+    # file_path = save_folder_path+exp_name+"_decoding_step_operator_breakdown_overall.pdf"
     # os.makedirs(save_folder_path, exist_ok=True)
     # print("graph_path = ", file_path)
     # plt.savefig(file_path, dpi=dpi)
 
-    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.png", dpi)
+    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.pdf", dpi)
 
 
 def graph_overall_ratio(kernel_breakdown, xlabel, exp_name, save_folder_path):
@@ -536,16 +538,16 @@ def graph_overall_ratio(kernel_breakdown, xlabel, exp_name, save_folder_path):
     # plt.show()
 
     # # folder_path = args.graph_path+"/"+ ("/".join(folder_name_split[-2:]) if "retrieval" in folder_name_split else folder_name_split[-1])
-    # file_path = save_folder_path+exp_name+"_decoding_step_operator_breakdown_overall_ratio.png"
+    # file_path = save_folder_path+exp_name+"_decoding_step_operator_breakdown_overall_ratio.pdf"
     # os.makedirs(save_folder_path, exist_ok=True)
     # print("graph_path = ", file_path)
     # plt.savefig(file_path, dpi=dpi)
 
-    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (%)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall_ratio.png", dpi)
+    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (%)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall_ratio.pdf", dpi)
 
 
 def graph_overall_compare(kernel_breakdown, compare_breakdown, xlabel, exp_name, save_folder_path):
-    fig, ax, dpi = prep_graph()
+    fig, ax, dpi = prep_graph(nested=True)
 
     labels = list(kernel_breakdown.keys())
 
@@ -559,24 +561,27 @@ def graph_overall_compare(kernel_breakdown, compare_breakdown, xlabel, exp_name,
 
     for idx, (k, v) in enumerate(kernel_breakdown.items()):
         # ax.bar(xlabel, v, bottom = bottom, label=k, color=cmap[k], width=0.8)
-        ax.bar([xx-shift for xx in x], v, bottom=bottom, label=k, color=cmap[k], width=0.35)
-        ax.bar([xx+shift for xx in x], compare_breakdown[k], bottom=bottom_compare, color=cmap[k], width=0.35)
+        ax.bar([xx-shift for xx in x], v if len(kernel_breakdown) != 0 else [0]*len(x), bottom=bottom, label=k, color=cmap[k], width=0.35)
+        ax.bar([xx+shift for xx in x], compare_breakdown[k] if len(compare_breakdown) != 0 else [0]*len(x), bottom=bottom_compare, color=cmap[k], width=0.35)
         bottom = np.add(bottom, v)
         bottom_compare = np.add(bottom_compare, compare_breakdown[k])
 
     ax.legend(fontsize=4)
-    plt.xticks([val for pair in zip([xx-shift for xx in x], [xx+shift for xx in x]) for val in pair], ["w/", "w/o"]*steps_len, rotation=30)
+    plt.xticks([val for pair in zip([xx-shift for xx in x], [xx+shift for xx in x]) for val in pair], ["w/", "w/o"]*steps_len, fontsize=6)
 
     sec = ax.secondary_xaxis(location=0)
-    sec.set_xticks(x, labels=["\n"+xl for xl in xlabel], fontsize=6)
+    if len(xlabel) == 20:
+        sec.set_xticks(x, labels=[xl+"        " for xl in xlabel], fontsize=6, rotation=90)
+    else:
+        sec.set_xticks(x, labels=["\n"+xl for xl in xlabel], fontsize=6)
     sec.tick_params(bottom = False) 
 
     folder_name_split = args.json_file.split("/")
     title_name = folder_name_split[-1] + " " + exp_name + " Exp\nOperator Breakdown w/ GPU Idle(Inference)\n" + ("Warmup with 5 examples, profile result for 6th inference sample" if "t2i" in args.json_file else "Warmup with 10 examples, profile result for 11th inference sample")
-    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.png", dpi, nexted_axis=True)
+    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.pdf", dpi, nested=True)
 
 def graph_overall_ratio_compare(kernel_breakdown, compare_breakdown, xlabel, exp_name, save_folder_path):
-    fig, ax, dpi = prep_graph()
+    fig, ax, dpi = prep_graph(nested=True)
     assert kernel_breakdown.keys() == compare_breakdown.keys()
     labels = list(kernel_breakdown.keys())
 
@@ -595,21 +600,24 @@ def graph_overall_ratio_compare(kernel_breakdown, compare_breakdown, xlabel, exp
         total_time_compare.append(sum([v[i] for v in compare_breakdown.values()]))
 
     for idx, (k, v) in enumerate(kernel_breakdown.items()):
-        ax.bar([xx-shift for xx in x], [vv/t*100 if t!=0 else 0 for vv, t in zip(v, total_time)], bottom = bottom, label=k, color=cmap[k], width=0.35)
-        ax.bar([xx+shift for xx in x], [vv/t*100 if t!=0 else 0 for vv, t in zip(compare_breakdown[k], total_time_compare)], bottom = bottom_compare, color=cmap[k], width=0.35)
+        ax.bar([xx-shift for xx in x], [vv/t*100 if t!=0 else 0 for vv, t in zip(v, total_time)] if len(kernel_breakdown) != 0  else [0]*len(x), bottom = bottom, label=k, color=cmap[k], width=0.35)
+        ax.bar([xx+shift for xx in x], [vv/t*100 if t!=0 else 0 for vv, t in zip(compare_breakdown[k], total_time_compare)] if len(compare_breakdown) != 0  else [0]*len(x), bottom = bottom_compare, color=cmap[k], width=0.35)
         bottom = np.add(bottom, [vv/t*100 if t!=0 else 0 for vv, t in zip(v, total_time)])
         bottom_compare = np.add(bottom_compare, [vv/t*100 if t!=0 else 0 for vv, t in zip(compare_breakdown[k], total_time_compare)])
 
     ax.legend(fontsize=4)
-    plt.xticks([val for pair in zip([xx-shift for xx in x], [xx+shift for xx in x]) for val in pair], ["w/", "w/o"]*steps_len, rotation=30)
+    plt.xticks([val for pair in zip([xx-shift for xx in x], [xx+shift for xx in x]) for val in pair], ["w/", "w/o"]*steps_len, fontsize=6)
 
     sec = ax.secondary_xaxis(location=0)
-    sec.set_xticks(x, labels=["\n"+xl for xl in xlabel], fontsize=6)
+    if len(xlabel) == 20:
+        sec.set_xticks(x, labels=[xl+"        " for xl in xlabel], fontsize=6, rotation=90)
+    else:
+        sec.set_xticks(x, labels=["\n"+xl for xl in xlabel], fontsize=6)
     sec.tick_params(bottom = False) 
 
     folder_name_split = args.json_file.split("/")
     title_name = folder_name_split[-1] + " " + exp_name + " Exp\nOperator Breakdown w/ GPU Idle(Inference)\n" + ("Warmup with 5 examples, profile result for 6th inference sample" if "t2i" in args.json_file else "Warmup with 10 examples, profile result for 11th inference sample")
-    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (%)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall_ratio.png", dpi, nexted_axis=True)
+    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (%)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall_ratio.pdf", dpi, nested=True)
 
 
 def gather_result(profile_result, overall_breakdown):
@@ -639,19 +647,7 @@ if args.batch_size:
         exp_info = args.json_file.split("/")[-1].split("bs")
         file_path = '/'.join(args.json_file.split("/")[:-1])+"/"+exp_info[0]+"bs"+bs+"."+'.'.join(exp_info[1].split(".")[1:])+"/profile.json"
         profile_result = parse_file(file_path, plot_graph=False)
-
         gather_result(profile_result, overall_breakdown)
-        # if profile_result != dict():
-        #     if overall_breakdown == dict():
-        #         for k in profile_result.keys():
-        #             overall_breakdown[k] = list()
-
-        #     assert profile_result.keys() == overall_breakdown.keys()
-        #     for k, v in profile_result.items():
-        #         overall_breakdown[k].append(sum(v))
-        # else:
-        #     for k, v in overall_breakdown.items():
-        #         overall_breakdown[k].append(0)
 
     folder_name_split = args.json_file.split("/")
     exp_info = folder_name_split[-1].split("bs")
@@ -671,18 +667,6 @@ elif args.n_retrieved_doc:
         profile_result = parse_file(file_path, plot_graph=False)
         gather_result(profile_result, overall_breakdown)
 
-        # if profile_result != dict():
-        #     if overall_breakdown == dict():
-        #         for k in profile_result.keys():
-        #             overall_breakdown[k] = list()
-
-        #     assert profile_result.keys() == overall_breakdown.keys()
-        #     for k, v in profile_result.items():
-        #         overall_breakdown[k].append(sum(v))
-        # else:
-        #     for k, v in overall_breakdown.items():
-        #         overall_breakdown[k].append(0)
-
     folder_name_split = args.json_file.split("/")
     exp_info = folder_name_split[-1].split("bs")
     save_folder_path = args.graph_path+"/"+ ("wo_efficient_attn/" if "wo_efficient_attn" in args.json_file else "") + ("retrieval/" if "retrieval" in args.json_file else "batch_size_overall/")+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
@@ -690,7 +674,7 @@ elif args.n_retrieved_doc:
     graph_overall(overall_breakdown, NRETRIEVED_DOCS, "n_retrieved_docs", save_folder_path)
     graph_overall_ratio(overall_breakdown, NRETRIEVED_DOCS, "n_retrieved_docs", save_folder_path)
 
-elif args.both:
+elif args.both and not args.compare_efficient_attn:
     assert "retrieval" in args.json_file
 
     # BATCH_SIZE and NRETRIEVED_DOCS Iterate
@@ -703,17 +687,6 @@ elif args.both:
             file_path = '/'.join(args.json_file.split("/")[:-1])+"/"+exp_info[0]+bs+"."+'.'.join(exp_info[1].split(".")[1:])+"."+nd+"/profile.json"
             profile_result = parse_file(file_path, plot_graph=False)
             gather_result(profile_result, overall_breakdown)
-            # if profile_result != dict():
-            #     if overall_breakdown == dict():
-            #         for k in profile_result.keys():
-            #             overall_breakdown[k] = list()
-
-            #     assert profile_result.keys() == overall_breakdown.keys()
-            #     for k, v in profile_result.items():
-            #         overall_breakdown[k].append(sum(v))
-            # else:
-            #     for k, v in overall_breakdown.items():
-            #         overall_breakdown[k].append(0)
 
     folder_name_split = args.json_file.split("/")
     exp_info = folder_name_split[-1].split("bs")
@@ -722,7 +695,7 @@ elif args.both:
     graph_overall(overall_breakdown, ['.'.join(ip) for ip in list(itertools.product(BATCH_SIZE, NRETRIEVED_DOCS))], "batch_size&n_retrieved_docs", save_folder_path)
     graph_overall_ratio(overall_breakdown, ['.'.join(ip) for ip in list(itertools.product(BATCH_SIZE, NRETRIEVED_DOCS))], "batch_size&n_retrieved_docs", save_folder_path)
 
-elif args.compare_efficient_attn:
+elif args.compare_efficient_attn and not args.both:
     assert args.compare_dir != ""
     # Batch Iterate
     BATCH_SIZE=["1", "4", "8", "16", "32"]
@@ -738,18 +711,6 @@ elif args.compare_efficient_attn:
         profile_result = parse_file(file_path, plot_graph=False)
         gather_result(profile_result, compare_breakdown)
 
-        # if profile_result != dict():
-        #     if overall_breakdown == dict():
-        #         for k in profile_result.keys():
-        #             overall_breakdown[k] = list()
-
-        #     assert profile_result.keys() == overall_breakdown.keys()
-        #     for k, v in profile_result.items():
-        #         overall_breakdown[k].append(sum(v))
-        # else:
-        #     for k, v in overall_breakdown.items():
-        #         overall_breakdown[k].append(0)
-
     folder_name_split = args.json_file.split("/")
     exp_info = folder_name_split[-1].split("bs")
     save_folder_path = args.graph_path+"/wo_efficient_attn/compare/" + ("retrieval/" if "retrieval" in args.json_file else "batch_size_overall/")+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
@@ -757,9 +718,49 @@ elif args.compare_efficient_attn:
     graph_overall_compare(overall_breakdown, compare_breakdown, BATCH_SIZE, "batch_size", save_folder_path)
     graph_overall_ratio_compare(overall_breakdown, compare_breakdown, BATCH_SIZE, "batch_size", save_folder_path)
 
+elif args.compare_efficient_attn and args.both:
+    assert args.compare_dir != ""
+    assert "retrieval" in args.json_file
+    
+    # Batch Iterate
+    BATCH_SIZE=["bs1", "bs4", "bs8", "bs16"]#, "bs32"]
+    NRETRIEVED_DOCS=["original", "n_retrieved_docs1", "n_retrieved_docs2", "n_retrieved_docs3", "n_retrieved_docs4"]
+
+    overall_breakdown = dict()
+    compare_breakdown = dict()
+    for bs in BATCH_SIZE:
+        for nd in NRETRIEVED_DOCS:
+            if nd == "original":
+                original_path = re.sub('default_retrieval_template.', 'cm3v2_template.' if "t2i" not in args.json_file else '', re.sub('flamingo_retrieval_v2_template.', 'cm3v2_template.' if "t2i" not in args.json_file else '', args.json_file))
+                exp_info = original_path.split("/")[-1].split("bs")
+                file_path = '/'.join(original_path.split("/")[:-2])+"/"+exp_info[0]+bs+"."+'.'.join(exp_info[1].split(".")[1:])+"/profile.json"
+                profile_result = parse_file(file_path, plot_graph=False)
+                gather_result(profile_result, overall_breakdown)
+
+                file_path = re.sub(r'retrieval', '', re.sub(r'flamingo_retrieval_v2_template.', 'cm3v2_template.' if "t2i" not in args.json_file else '', args.compare_dir))+"/"+exp_info[0]+bs+"."+'.'.join(exp_info[1].split(".")[1:])+"/profile.json"
+                profile_result = parse_file(file_path, plot_graph=False)
+                gather_result(profile_result, compare_breakdown)
+            
+            else:
+                exp_info = args.json_file.split("/")[-1].split("bs")
+                file_path = '/'.join(args.json_file.split("/")[:-1])+"/"+exp_info[0]+bs+"."+'.'.join(exp_info[1].split(".")[1:])+"."+nd+"/profile.json"
+                profile_result = parse_file(file_path, plot_graph=False)
+                gather_result(profile_result, overall_breakdown)
+
+                file_path = args.compare_dir+"/"+exp_info[0]+bs+"."+'.'.join(exp_info[1].split(".")[1:])+"."+nd+"/profile.json"
+                profile_result = parse_file(file_path, plot_graph=False)
+                gather_result(profile_result, compare_breakdown)
+
+    folder_name_split = args.json_file.split("/")
+    exp_info = folder_name_split[-1].split("bs")
+    save_folder_path = args.graph_path+"/wo_efficient_attn/compare/" + ("retrieval/" if "retrieval" in args.json_file else "batch_size_overall/")+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
+    os.makedirs(save_folder_path, exist_ok=True)
+    graph_overall_compare(overall_breakdown, compare_breakdown, ['.'.join(l) for l in list(itertools.product(BATCH_SIZE, NRETRIEVED_DOCS))], "batch_size", save_folder_path)
+    graph_overall_ratio_compare(overall_breakdown, compare_breakdown, ['.'.join(l) for l in list(itertools.product(BATCH_SIZE, NRETRIEVED_DOCS))], "batch_size", save_folder_path)
+
 else:
     folder_name_split = args.json_file.split("/")
     # exp_info = folder_name_split[-1].split("bs")
     # save_folder_path = args.graph_path+"/"+(folder_name_split[-2:] if "retrieval" in args.json_file else folder_name_split[-1])
-    save_folder_path = args.graph_path+"/"+folder_name_split[-2]+"/"
+    save_folder_path = args.graph_path+"/"+ ("wo_efficient_attn/" if "wo_efficient_attn" in args.json_file else "") + ("retrieval/" if "retrieval" in args.json_file else "")+folder_name_split[-2]+"/"
     profile_result = parse_file(args.json_file, save_folder_path=save_folder_path)
