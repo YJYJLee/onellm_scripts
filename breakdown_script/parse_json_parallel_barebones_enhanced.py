@@ -32,6 +32,7 @@ parser.add_argument("--n-retrieved-doc", action="store_true", default=False)
 parser.add_argument("--both", action="store_true", default=False)
 parser.add_argument("--compare-efficient-attn", action="store_true", default=False)
 parser.add_argument("--compare-dir", type=str, default="")
+parser.add_argument("--multigpu", action="store_true", default=False)
 
 
 # Get arguments into readable format:
@@ -60,6 +61,7 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
 
     if os.path.isfile(file_path):
         file_p = open(file_path)
+        print("Reading from ", file_path)
     else:
         print("File doesn't exists!!!! ", file_path)
         return kernel_breakdown
@@ -139,8 +141,6 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
     # print("gpu_kernels = ", gpu_launch_kernels[2])
     # print("LEN CPU DESIRED OPS = ", len(cpu_desired_ops))
 
-
-
     kernel_breakdowns = {}
 
     ###########################################
@@ -155,7 +155,7 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
 
     gpu_launch_kernels = sorted(gpu_launch_kernels, key=lambda x: x['ts'])
     gpu_kernels = sorted(gpu_kernels, key=lambda x: x['ts'])
-
+    nccl_kernels = sorted(nccl_kernels, key=lambda x: x['ts'])
     cpu_desired_ops = sorted(cpu_desired_ops, key=lambda x: x['ts'])
 
     print("Finished sorting")
@@ -165,7 +165,8 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
     decoding_step_time = list()
     end_of_decoding_step = None
     entered_scoring = False
-
+    decoding_step_start_time = [gpu_kernels[0]["ts"]]
+    
     # for idx,l in enumerate(jsonString):
     for idx, launch in tqdm(enumerate(gpu_launch_kernels)):
 
@@ -187,12 +188,14 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
         found_cpu = False
 
         while current_cpu_desired_index < len(cpu_desired_ops) and found_cpu == False:
-
+            print(current_cpu_desired_index,  found_cpu == False)
             cpu_op = cpu_desired_ops[current_cpu_desired_index]
 
             cpu_start = cpu_op["ts"]
             cpu_end = cpu_op["ts"]+cpu_op["dur"]
-
+            print("cpu_op: ", cpu_op)
+            print(cpu_start, " ", cpu_end)
+            print("time_start: ", time_start)
             # print("cpu_op = ", cpu_op["name"])
             # current_cpu_desired_index_changed = False
 
@@ -218,7 +221,7 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
             elif cpu_end <= time_start:
                 # if current_cpu_desired_index_changed==True and cpu_op["name"] == "MODULE_SCORING_AG":
                 if current_cpu_desired_index < len(cpu_desired_ops) and cpu_op["name"] == "MODULE_SCORING_AG":
-                    # print("Min: ", min_launch["ts"], " Max: ", gpu_kernels[idx-1]["ts"])
+                    # print("Min: ", min_launch["ts"], " Max: ", end_of_decoding_step["ts"])
                     # print(min_launch, " ", gpu_kernels[idx-1])
 
                     # print("Min: ", min_launch["ts"], " Max: ", end_of_decoding_step["ts"], " / ", end_of_decoding_step["ts"]+end_of_decoding_step["dur"]-min_launch["ts"])
@@ -230,6 +233,7 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
 
                     for k, v in kernel_breakdown.items():
                         v.append(0)
+                    decoding_step_start_time.append(gpu_time_start)
 
 
                 # if also before end of next annotation
@@ -265,13 +269,31 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
 
     if cpu_op["name"] == "MODULE_SCORING_AG":
 
-        # print("Min: ", min_launch["ts"], " Max: ", corresp_gpu_kernel["ts"])
+        # print("Min: ", min_launch["ts"], " Max: ", end_of_decoding_step["ts"])
         # print(min_launch, " ", corresp_gpu_kernel)
 
         # print("Min: ", min_launch["ts"], " Max: ", end_of_decoding_step["ts"], " / ", end_of_decoding_step["ts"]+end_of_decoding_step["dur"]-min_launch["ts"])
         # print(min_launch, " ", end_of_decoding_step, " / idx-1: ", idx-1)
 
         decoding_step_time.append((end_of_decoding_step["ts"]+end_of_decoding_step["dur"]-min_launch["ts"])/1000)
+
+
+    if len(nccl_kernels) > 0:
+        communication_list = [0]
+        idx = 1
+        for nc in nccl_kernels:
+            if idx == len(decoding_step_start_time) or decoding_step_start_time[idx] >= nc['ts']:
+                communication_list[idx-1] += nc['dur']/1000
+            else:
+                idx+=1
+                if idx < len(decoding_step_start_time):
+                    assert decoding_step_start_time[idx] >= nc['ts']
+                
+                communication_list.append(nc['dur']/1000)
+    else:
+        communication_list = [0]*len(decoding_step_start_time)
+
+    kernel_breakdown["Communication"] = communication_list
 
     print("combined_kernel_breakdown = ", kernel_breakdown)
 
@@ -290,7 +312,7 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
 
     idle_list = list()
     for s in np.arange(len(kernel_breakdown["MODULE_SCORING_AG"])):
-        idle_list.append(decoding_step_time[s]-sum([v[s] if k!="MODULE_SCORING_AG" else 0 for k, v in kernel_breakdown.items()]))
+        idle_list.append(decoding_step_time[s]-sum([(v[s]) if k!="MODULE_SCORING_AG" else 0 for k, v in kernel_breakdown.items()]))
     kernel_breakdown["Idle"] = idle_list
 
     if plot_graph:
@@ -303,6 +325,8 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
 ############################################################################################################################################
 
 colormap = colormaps['Set3'].colors
+colormap2 = colormaps['Paired'].colors
+
 cmap = {"MODULE_ParallelEmbedding_AG": colormap[0],
     "Misc": colormap[1],
     "MODULE_FusedRMSNorm_AG": colormap[2],
@@ -311,7 +335,11 @@ cmap = {"MODULE_ParallelEmbedding_AG": colormap[0],
     "MODULE__InnerAttention_AG": colormap[5],
     "Copy": colormap[7],
     "MODULE_SCORING_AG": colormap[8],
-    "Idle": colormap[9]}
+    "Idle": colormap[9],
+    "Communication": colormap[10],
+    "MODULE_PREPROC_ENCODE_IMAGES_AG": colormap[11],
+    "MODULE_POSTPROC_GENERATE_TEXT_AG": colormap2[0],
+}
     
 def prep_graph(nested=False):
     print("GRAPHING")
@@ -320,7 +348,7 @@ def prep_graph(nested=False):
 
     dpi = 320
 
-    page_width = 12
+    page_width = 48 if args.multigpu and args.batch_size else 12
     lr_margin = 0.75
     column_separation = 0.25
 
@@ -344,7 +372,7 @@ def wrapup_graph(plt, ax, exp_name, xlabel, yaxis_title, title, save_folder_path
     ax.set_axisbelow(True)
     plt.show()
 
-    file_path = save_folder_path+exp_name+filename
+    file_path = save_folder_path+re.sub("\n", "", exp_name)+filename
     print("graph_path = ", file_path)
     plt.savefig(file_path, dpi=dpi)
 
@@ -462,7 +490,7 @@ def graph_gpu_kernel_breakdown_idle(kernel_breakdown, save_folder_path):
     print("graph_path = ", file_path)
     plt.savefig(file_path, dpi=dpi)
 
-def graph_overall(kernel_breakdown, xlabel, exp_name, save_folder_path):
+def graph_overall(kernel_breakdown, xlabel, exp_name, save_folder_path, nested=False, secondary_xlabel=None):
     fig, ax, dpi = prep_graph()
 
     labels = list(kernel_breakdown.keys())
@@ -479,31 +507,17 @@ def graph_overall(kernel_breakdown, xlabel, exp_name, save_folder_path):
 
     ax.legend(fontsize=4)
 
+    # if nested:
+    #     sec = ax.secondary_xaxis(location=0)
+    #     sec.set_xticks(x, labels=secondary_xlabel, fontsize=6)
+
     folder_name_split = args.json_file.split("/")
     title_name = folder_name_split[-1] + " " + exp_name + " Exp\nOperator Breakdown w/ GPU Idle(Inference)\n" + ("Warmup with 5 examples, profile result for 6th inference sample" if "t2i" in args.json_file else "Warmup with 10 examples, profile result for 11th inference sample")
-    # plt.ylabel('Execution Time Breakdown (ms)', fontsize=6)
-    # plt.xlabel(exp_name, fontsize=6)
-    # plt.title(title_name, fontsize=6)
 
-    # plt.xticks(fontsize=6)
-    # plt.yticks(fontsize=6)
-    # ax.tick_params(axis='x', rotation=90 if len(xlabel[-1])>8 else 0)
-
-    # plt.grid(lw=0.2)
-    # ax.set_axisbelow(True)
-    # plt.show()
-
-    # # folder_path = args.graph_path+"/"+"/".join(folder_name_split[-2:])
-    # # folder_path = args.graph_path+"/"+ ("/".join(folder_name_split[-2:]) if "retrieval" in folder_name_split else folder_name_split[-1])
-    # file_path = save_folder_path+exp_name+"_decoding_step_operator_breakdown_overall.pdf"
-    # os.makedirs(save_folder_path, exist_ok=True)
-    # print("graph_path = ", file_path)
-    # plt.savefig(file_path, dpi=dpi)
-
-    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.pdf", dpi)
+    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.pdf", dpi, nested=nested)
 
 
-def graph_overall_ratio(kernel_breakdown, xlabel, exp_name, save_folder_path):
+def graph_overall_ratio(kernel_breakdown, xlabel, exp_name, save_folder_path, nested=False, secondary_xlabel=None):
     fig, ax, dpi = prep_graph()
     
     labels = list(kernel_breakdown.keys())
@@ -522,28 +536,14 @@ def graph_overall_ratio(kernel_breakdown, xlabel, exp_name, save_folder_path):
 
     ax.legend(fontsize=4)
 
+    # if nested:
+    #     sec = ax.secondary_xaxis(location=0)
+    #     sec.set_xticks(x, labels=secondary_xlabel, fontsize=6)
 
     folder_name_split = args.json_file.split("/")
     title_name = folder_name_split[-1] + " " + exp_name + " Exp\nOperator Breakdown w/ GPU Idle(Inference)\n" + ("Warmup with 5 examples, profile result for 6th inference sample" if "t2i" in args.json_file else "Warmup with 10 examples, profile result for 11th inference sample")
-    # plt.ylabel('Execution Time Breakdown (%)', fontsize=6)
-    # plt.xlabel(exp_name, fontsize=6)
-    # plt.title(title_name, fontsize=6)
 
-    # plt.xticks(fontsize=6)
-    # plt.yticks(fontsize=6)
-    # ax.tick_params(axis='x', rotation=90 if len(xlabel[-1])>8 else 0)
-
-    # plt.grid(lw=0.2)
-    # ax.set_axisbelow(True)
-    # plt.show()
-
-    # # folder_path = args.graph_path+"/"+ ("/".join(folder_name_split[-2:]) if "retrieval" in folder_name_split else folder_name_split[-1])
-    # file_path = save_folder_path+exp_name+"_decoding_step_operator_breakdown_overall_ratio.pdf"
-    # os.makedirs(save_folder_path, exist_ok=True)
-    # print("graph_path = ", file_path)
-    # plt.savefig(file_path, dpi=dpi)
-
-    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (%)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall_ratio.pdf", dpi)
+    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (%)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall_ratio.pdf", dpi, nested=nested)
 
 
 def graph_overall_compare(kernel_breakdown, compare_breakdown, xlabel, exp_name, save_folder_path):
@@ -619,26 +619,68 @@ def graph_overall_ratio_compare(kernel_breakdown, compare_breakdown, xlabel, exp
     title_name = folder_name_split[-1] + " " + exp_name + " Exp\nOperator Breakdown w/ GPU Idle(Inference)\n" + ("Warmup with 5 examples, profile result for 6th inference sample" if "t2i" in args.json_file else "Warmup with 10 examples, profile result for 11th inference sample")
     wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (%)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall_ratio.pdf", dpi, nested=True)
 
+def graph_overall_grouped(kernel_breakdown, xlabel, exp_name, save_folder_path, secondary_xlabel):
+    fig, ax, dpi = prep_graph(nested=True)
 
-def gather_result(profile_result, overall_breakdown):
+    labels = list(kernel_breakdown.keys())
+
+    steps_len = len(xlabel)
+    # steps = np.arange(steps_len)
+    bottom = [[0]*len(secondary_xlabel)]*steps_len
+    x = np.arange(steps_len)
+
+
+    from matplotlib import colormaps
+    colormap = colormaps['Set3'].colors
+
+    x = np.arange(len(secondary_xlabel))
+    shift = 0.12
+
+    for idx, (k, v) in enumerate(kernel_breakdown.items()):
+        for idx2, bs in enumerate(xlabel):
+            ax.bar([xx-shift*(3-idx2) if idx2<=3 else xx+shift*(idx2-3) for xx in x], v[idx2::len(xlabel)] if len(kernel_breakdown) != 0 else [0]*len(x), bottom=bottom[idx2], label=k if idx2==0 else None, color=cmap[k], width=shift)
+            bottom[idx2] = np.add(bottom[idx2], v[idx2::len(xlabel)])
+
+
+    plt.xticks([val for pair in zip([xx-shift*3 for xx in x], [xx-shift*2 for xx in x], [xx-shift*1 for xx in x], [xx-shift*0 for xx in x], [xx+shift*1 for xx in x], [xx+shift*2 for xx in x], [xx+shift*3 for xx in x]) for val in pair], xlabel*len(secondary_xlabel), fontsize=6)
+
+    sec = ax.secondary_xaxis(location=0)
+    sec.set_xticks(x, labels=["\n\n"+sx for sx in secondary_xlabel], fontsize=6)#, rotation=90)
+
+    # Rotating X-axis labels
+    ax.tick_params(axis='x')#, rotation=90)
+    ax.set_ylabel("End-to-End Inference Runtime (ms)")
+
+    # ax.legend(loc="right", fontsize=6)
+    ax.legend(loc='best', ncol=3, fontsize=6)#, bbox_to_anchor=(0.5, 1.05))
+
+    folder_name_split = args.json_file.split("/")
+    title_name = folder_name_split[-1] + " " + re.sub("\n", "", exp_name) + " Exp\nOperator Breakdown w/ GPU Idle(Inference)\n" + ("Warmup with 5 examples, profile result for 6th inference sample" if "t2i" in args.json_file else "Warmup with 10 examples, profile result for 11th inference sample")
+    wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.pdf", dpi)
+
+
+def gather_result(profile_result, overall_breakdown, add_dummy=0, nested=False):
     if profile_result != dict():
-        if overall_breakdown == dict():
+        if len(overall_breakdown)==0:
             for k in profile_result.keys():
-                overall_breakdown[k] = list()
+                overall_breakdown[k] = [0]*add_dummy if add_dummy > 0 else list()
 
         assert profile_result.keys() == overall_breakdown.keys()
         for k, v in profile_result.items():
             overall_breakdown[k].append(sum(v))
     else:
-        for k, v in overall_breakdown.items():
-            overall_breakdown[k].append(0)
-
+        if len(overall_breakdown)==0:
+            return add_dummy+1
+        else:
+            for k, v in overall_breakdown.items():
+                overall_breakdown[k].append(0)
+    return 0
 
 if args.json_file.split("/")[-1] == "":
     print("Please remove \"/\" at the end of --json-file argument")
     exit(0)
 
-if args.batch_size:
+if args.batch_size and not args.multigpu:
     assert "retrieval" not in args.json_file
     # Batch Iterate
     BATCH_SIZE=["1", "4", "8", "16", "32"]
@@ -757,6 +799,80 @@ elif args.compare_efficient_attn and args.both:
     os.makedirs(save_folder_path, exist_ok=True)
     graph_overall_compare(overall_breakdown, compare_breakdown, ['.'.join(l) for l in list(itertools.product(BATCH_SIZE, NRETRIEVED_DOCS))], "batch_size", save_folder_path)
     graph_overall_ratio_compare(overall_breakdown, compare_breakdown, ['.'.join(l) for l in list(itertools.product(BATCH_SIZE, NRETRIEVED_DOCS))], "batch_size", save_folder_path)
+
+
+elif args.multigpu and args.batch_size:
+    NGPU_NNODE=[ ("1-8"), ("1-1"), ("4-1"), ("8-1"), ("4-2"), ("2-4")]
+    BATCH_SIZE=["64"]
+    # BATCH_SIZE=["1", "4", "8", "16", "32", "64", "128"]
+    overall_breakdown = dict()
+    overall_latency_breakdown = dict()
+    warmup=18
+    num_sample=5
+    add_dummy=0
+    add_dummy2=0
+    for config in NGPU_NNODE:
+        ngpu, nnode = config.split('-')
+        file_dir = re.sub(r"[0-9]gpu_[0-9]node", ngpu+"gpu_"+nnode+"node", args.json_file)
+        for bs in BATCH_SIZE:
+            multigpu_breakdown = dict()
+            multigpu_latency_breakdown = dict()
+            all_exist=True
+
+            for sample_id in range(warmup, warmup+num_sample):
+                sample_multigpu_breakdown = dict()
+                sample_multigpu_latency_breakdown = dict()
+
+                for g in range(int(ngpu)*int(nnode)):
+                    exp_info = file_dir.split("/")[-1].split("mbs.")
+                    file_path = '/'.join(file_dir.split("/")[:-1])+"/"+exp_info[0]+"mbs."+bs+"."+".".join(exp_info[1].split(".")[1:])+"/profile_sample_"+str(sample_id)+"_gpu_"+str(g)+".json"
+                    if not os.path.isfile(file_path):
+                        print(file_path)
+                    profile_result = parse_file(file_path, plot_graph=False)
+                    # profile_result = {'MODULE_PREPROC_ENCODE_IMAGES_AG': [19.204000000000004, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'Misc': [8.792000000000002, 0.43700000000000033, 0.4300000000000003, 0.4280000000000003, 0.4240000000000003, 0.4240000000000003, 0.4270000000000003, 0.4310000000000003, 0.4300000000000003, 0.4260000000000003], 'MODULE_ParallelEmbedding_AG': [0.092, 0.003, 0.003, 0.003, 0.004, 0.004, 0.003, 0.004, 0.004, 0.003], 'MODULE_FusedRMSNorm_AG': [4.769000000000001, 3.2909999999999955, 3.2749999999999955, 3.258999999999997, 3.2539999999999956, 3.254999999999996, 3.2509999999999972, 3.251999999999996, 3.2459999999999964, 3.258999999999996], 'MODULE_LayerNorm_AG': [8.097999999999997, 0.33600000000000024, 0.33600000000000024, 0.33600000000000024, 0.33600000000000024, 0.33600000000000024, 0.33600000000000024, 0.33600000000000024, 0.33600000000000024, 0.33600000000000024], 'MODULE__InnerAttention_AG': [25.89500000000002, 6.263999999999969, 6.218999999999967, 6.200999999999968, 6.17399999999997, 6.200999999999968, 6.207999999999968, 6.209999999999968, 6.206999999999969, 6.2039999999999695], 'Copy': [0.35, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004], 'MODULE_SCORING_AG': [0.06300000000000001, 0.08200000000000002, 0.08400000000000002, 0.08200000000000002, 0.08300000000000002, 0.08300000000000002, 0.08400000000000003, 0.08400000000000002, 0.08100000000000002, 0.08500000000000002], 'Communication': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'Linear': [314.0490000000001, 40.52999999999994, 40.47799999999992, 40.448999999999934, 40.46899999999994, 40.45599999999993, 40.43899999999994, 40.48199999999996, 40.44099999999993, 40.44599999999994], 'Idle': [13.661999999999864, 78.36300000000011, 77.53000000000011, 80.00700000000012, 76.6300000000001, 80.6880000000001, 76.9760000000001, 80.09600000000007, 77.9250000000001, 80.33800000000008]}
+                    if len(profile_result)==0:
+                        all_exist = False
+                    gather_result(profile_result, sample_multigpu_breakdown)
+                    gather_result({k:[vv/int(bs) for vv in v] for k, v in profile_result.items()}, sample_multigpu_latency_breakdown)
+
+                for k, v in sample_multigpu_breakdown.items():
+                    assert len(v)==int(ngpu)*int(nnode)
+                    assert len(sample_multigpu_latency_breakdown[k])==int(ngpu)*int(nnode)
+
+                if all_exist:
+                    sample_multigpu_breakdown = {k: [np.average(v)] for k, v in sample_multigpu_breakdown.items()}
+                    sample_multigpu_latency_breakdown = {k: [np.average(v)] for k, v in sample_multigpu_latency_breakdown.items()}
+                else:
+                    sample_multigpu_breakdown = dict()
+                    sample_multigpu_latency_breakdown = dict()
+
+                for k, v in sample_multigpu_breakdown.items():
+                    assert len(v)==1, len(v)
+                for k, v in sample_multigpu_latency_breakdown.items():
+                    assert len(v)==1, len(v)
+                    
+                gather_result(sample_multigpu_breakdown, multigpu_breakdown)
+                gather_result(sample_multigpu_latency_breakdown, multigpu_latency_breakdown)
+
+            for k, v in multigpu_breakdown.items():
+                assert len(v)==num_sample, len(v)
+            for k, v in multigpu_latency_breakdown.items():
+                assert len(v)==num_sample, len(v)
+
+            multigpu_breakdown = {k: [np.average(v)] for k, v in multigpu_breakdown.items()}
+            multigpu_latency_breakdown = {k: [np.average(v)] for k, v in multigpu_latency_breakdown.items()}
+
+            add_dummy = gather_result(multigpu_breakdown, overall_breakdown, add_dummy)
+            add_dummy2 = gather_result(multigpu_latency_breakdown, overall_latency_breakdown, add_dummy2)
+
+    folder_name_split = args.json_file.split("/")
+    exp_info = folder_name_split[-1].split("mbs")
+    save_folder_path = args.graph_path+"/"+ ("wo_efficient_attn/" if "wo_efficient_attn" in args.json_file else "") + ("retrieval/" if "retrieval" in args.json_file else "batch_size_overall/")+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/"
+    os.makedirs(save_folder_path, exist_ok=True)
+    graph_overall_grouped(overall_breakdown, BATCH_SIZE, "\n\nbatch_size", save_folder_path, secondary_xlabel=NGPU_NNODE)
+    save_folder_path = args.graph_path+"/"+ ("wo_efficient_attn/" if "wo_efficient_attn" in args.json_file else "") + ("retrieval/" if "retrieval" in args.json_file else "batch_size_overall/")+exp_info[0]+'.'.join(exp_info[1].split(".")[1:])+"/latency/"
+    os.makedirs(save_folder_path, exist_ok=True)
+    graph_overall_grouped(overall_latency_breakdown, BATCH_SIZE, "\n\nbatch_size", save_folder_path, secondary_xlabel=NGPU_NNODE)
 
 else:
     folder_name_split = args.json_file.split("/")
