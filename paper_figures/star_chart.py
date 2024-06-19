@@ -5,9 +5,10 @@ import os
 import re
 from matplotlib import colormaps
 from math import nan, isnan, ceil
+import math
 
 class Radar(object):
-    def __init__(self, figure, title, labels, rect=None):
+    def __init__(self, figure, title, labels=None, rect=None):
         if rect is None:
             # rect = [0.05, 0.05, 0.9, 0.9]
             rect = [0.05, 0, 0.9, 0.9]
@@ -27,8 +28,13 @@ class Radar(object):
             ax.grid(False)
             ax.xaxis.set_visible(False)
 
-        for ax, angle, label in zip(self.axes, self.angles, labels):
-            ax.set_rgrids(range(1, 6), angle=angle, labels=label, fontsize=12)
+        # for ax, angle, label in zip(self.axes, self.angles, labels):
+        #     ax.set_rgrids(range(1, 6), angle=angle, labels=label, fontsize=12)
+        #     ax.spines['polar'].set_visible(False)
+        #     ax.set_ylim(0, 6)
+            
+        for ax, angle in zip(self.axes, self.angles):
+            # ax.set_rgrids(range(1, 6), angle=angle, fontsize=12)
             ax.spines['polar'].set_visible(False)
             ax.set_ylim(0, 6)
 
@@ -36,6 +42,8 @@ class Radar(object):
         angle = np.deg2rad(np.r_[self.angles, self.angles[0]])
         values = np.r_[values, values[0]]
         self.ax.plot(angle, values, *args, **kw)
+        self.ax.fill(angle, values, alpha=0.1, color=kw['color'])
+
 
 
 if __name__ == '__main__':
@@ -53,17 +61,17 @@ if __name__ == '__main__':
             'HumanEval': 1,
             'MBPP': 1,
         },
-        {
-            'MSCOCO': 16,
-            'Vizwiz': 16,
-            'Coco_Image': 16,
-            'S2ST': 128,
-            'HumanEval': 16,
-            'MBPP': 4,
-        }
+        # {
+        #     'MSCOCO': 16,
+        #     'Vizwiz': 16,
+        #     'Coco_Image': 16,
+        #     'S2ST': 128,
+        #     'HumanEval': 16,
+        #     'MBPP': 4,
+        # }
     ]
 
-    def get_data(ns, batch_dict):
+    def get_data(ns, batch_dict, log=False):
         def get_seq_len(file_path, model=None):
             file_path += "/seq_lengths.txt"
             if os.path.isfile(file_path):
@@ -138,7 +146,7 @@ if __name__ == '__main__':
                     else:
                         slsl = [float(s) for s in re.sub("\n", "", sl).split("\t") if s!=""]
                         for idx, h in enumerate(headers):
-                            timer_result[h].append(slsl[idx])
+                            timer_result[h].append(slsl[idx] if not log else np.log(slsl[idx]))
             else:
                 print("File doesn't exist: " + file_path)
             return timer_result
@@ -497,7 +505,7 @@ if __name__ == '__main__':
         # '[T2T] Hellaswag': cmap[8],
         # '[T2T] Arc_easy': cmap[9],
         '[S2ST] Fleurs': cmap[12],
-        '[T2T] HumanEval': cmap[14]
+        '[T2T] HumanEval': cmap[14],
         '[T2T] MBPP': cmap[14]
     }
     
@@ -505,18 +513,18 @@ if __name__ == '__main__':
     for ns in num_shot:
         gathered_data[ns] = dict()
         for idx, bs in enumerate(batch_size):
-            gathered_data[ns][idx] = get_data(ns, bs)
+            gathered_data[ns][idx] = get_data(ns, bs, log=True)
         # gathered_data[ns] = get_data(ns)
 
-    max_data = [-1]*len(tit)
-    for ns in num_shot:
-        for gd in gathered_data[ns].values():
-            for idx, d in enumerate([list(i) for i in zip(*[d[1]for d in gd])]):
-                max_data[idx] = max(max_data[idx], max(d))
+    # max_data = [-1]*len(tit)
     # for ns in num_shot:
-    #     for idx, d in enumerate([list(i) for i in zip(*[d[1]for d in gathered_data[ns]])]):
-    #         max_data[idx] = max(max_data[idx], max(d))
-    print("MAX: ", max_data)
+    #     for gd in gathered_data[ns].values():
+    #         for idx, d in enumerate([list(i) for i in zip(*[d[1]for d in gd])]):
+    #             max_data[idx] = max(max_data[idx], max(d))
+    # # for ns in num_shot:
+    # #     for idx, d in enumerate([list(i) for i in zip(*[d[1]for d in gathered_data[ns]])]):
+    # #         max_data[idx] = max(max_data[idx], max(d))
+    # print("MAX: ", max_data)
 
     for ns in num_shot:
         for idx, bs in enumerate(batch_size):
@@ -524,21 +532,39 @@ if __name__ == '__main__':
             print("num shot: ", ns, bs)
             for d in data:
                 print(d)
-            
+
+
+            min_data = [math.inf]*len(tit)
+            max_data = [-1]*len(tit)
+            for idx, d in enumerate([list(i) for i in zip(*[d[1]for d in data])]):
+                max_data[idx] = max(max_data[idx], max(d))
+                min_data[idx] = min(min_data[idx], min(d))
+            print("MAX: ", max_data)
+
+
             lab = list()
+            shift = -1
             for idx, md in enumerate(max_data):
-                # if idx == len(max_data)-1:
-                #     lab.append([20,40,60,80,100])
-                # else:
-                div = 10**(len(str(int(md)))-1)
-                lab.append([int((ceil(md/div)*div)/5*(i+1)) for i in range(5)])
+                if idx==2:
+                    if min_data[idx] < 0:
+                        shift = min_data[idx]*-1
+                        md += shift
+                    div = 10**(len(str(int(md)))-1)
+                    lab.append([int((ceil(md/div)*div)/5*(i+1)) for i in range(5)])
+
+                else:
+                    div = 10**(len(str(int(md)))-1)
+                    lab.append([int((ceil(md/div)*div)/5*(i+1)) for i in range(5)])
+
 
             fig = plt.figure(figsize=(10, 10))#, layout='tight')
 
-            radar = Radar(fig, tit, lab)
+            radar = Radar(fig, tit)#, lab)
             
-            for idx, d in enumerate(data):
-                radar.plot([dd/(max_d/5) for dd, max_d in zip(d[1], max_data)],  '-', lw=2, color=colormap[d[0]], alpha=1, label=d[0])
+            for d in data:
+                # radar.plot([dd/(max_d/5) if dd>0 else (dd+shift)/(max_d/5) for idx, (dd, max_d) in enumerate(zip(d[1], max_data))], '-', lw=2, marker='o', color=colormap[d[0]], alpha=1, label=d[0])
+                radar.plot(d[1], '-', lw=2, marker='o', color=colormap[d[0]], alpha=1, label=d[0])
+
 
             radar.ax.legend(loc='upper right', bbox_to_anchor=(1.05, 1.05))
             # radar.ax.set_title("# Shot "+str(ns) + " / # GPU " + str(n_gpu) + " / Batch size "+str(bs), fontsize=18)
