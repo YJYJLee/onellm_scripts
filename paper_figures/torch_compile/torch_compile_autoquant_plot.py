@@ -59,17 +59,19 @@ def get_folder(dataset, bs, exp_name):
     elif dataset == "MBPP_small":
         return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/MBPP_codellama/meta-llama/CodeLlama-7b-hf/batch_size_"+str(bs)
     elif dataset == "Coco_Image":
-        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_img/"+chameleon_prefix+".mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+    elif dataset == "Coco_Image_small":
+        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_img/"+chameleon_prefix+".mn.cm3v21_109m_sft.t.coco_image."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_109m_sft.t.coco_image."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
     elif dataset == "Partiprompts":
-        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_img/"+chameleon_prefix+".mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
     elif dataset == "S2ST":
-        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/S2ST/batch_size_"+str(bs)+"/"
+        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/"+("batched" if exp_name=="latency_distribution_w_warmup" else "")+"/S2ST/batch_size_"+str(bs)+"/"
     elif dataset == "S2TT":
-        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/S2TT/batch_size_"+str(bs)+"/"
+        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/"+("batched" if exp_name=="latency_distribution_w_warmup" else "")+"/S2TT/batch_size_"+str(bs)+"/"
     elif dataset == "T2TT":
-        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/T2TT/batch_size_"+str(bs)+"/"
+        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/"+("batched" if exp_name=="latency_distribution_w_warmup" else "")+"/T2TT/batch_size_"+str(bs)+"/"
     elif dataset == "T2ST":
-        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/T2ST/batch_size_"+str(bs)+"/"
+        return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/"+("batched" if exp_name=="latency_distribution_w_warmup" else "")+"/T2ST/batch_size_"+str(bs)+"/"
     elif dataset == "HSTU-1M":
         return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/HSTU/num_embeddings_1000000_batch_size_"+str(bs)+"/"
     elif dataset == "HSTU-15M":
@@ -77,44 +79,72 @@ def get_folder(dataset, bs, exp_name):
     else:
         assert False
 
+batch_size_dict = {
+    "MSCOCO": 1,
+    "Vizwiz": 1,
+    "Coco_Image": 1,
+    "Coco_Image_small": 1,
+    "HumanEval": 1,
+    "HumanEval_small": 1,
+    "S2ST": 1,
+    "S2TT": 1,
+    "T2ST": 1,
+    "T2TT": 1,
+}
 
-baseline = [
-    sum([np.average(v[5:]) for v in get_latency(get_folder("MSCOCO", 8, "latency_distribution_w_warmup")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("Vizwiz", 8, "latency_distribution_w_warmup")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("Coco_Image", 8, "latency_distribution_w_warmup")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval", 1, "latency_distribution_w_warmup")).values()]),
-    # sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval_small", 4, "latency_distribution_w_warmup")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("S2ST", 64, "torch_compile_baseline")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("S2TT", 64, "torch_compile_baseline")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("T2ST", 64, "torch_compile_baseline")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("T2TT", 64, "torch_compile_baseline")).values()]),
-]
+baseline = []
+
+for k, bs in batch_size_dict.items():
+    baseline.append(sum([np.average(v[5:]) for v in get_latency(get_folder(k, bs, "latency_distribution_w_warmup")).values()]))
+
+torch_compile = []
+for k, bs in batch_size_dict.items():
+    baseline.append(sum([np.average(v[5:]) for v in get_latency(get_folder(k, bs, "torch_compile")).values()]))
+
+torch_compile_autoquant = []
+for k, bs in batch_size_dict.items():
+    baseline.append(sum([np.average(v[5:]) for v in get_latency(get_folder(k, bs, "torch_compile_autoquant")).values()]))
+
+# baseline = [
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("MSCOCO", batch_size_dict["MSCOCO"], "latency_distribution_w_warmup")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("Vizwiz", batch_size_dict["Vizwiz"], "latency_distribution_w_warmup")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("Coco_Image", batch_size_dict["Coco_Image"], "latency_distribution_w_warmup")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("Coco_Image_small", batch_size_dict["Coco_Image_small"], "latency_distribution_w_warmup")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval", batch_size_dict["HumanEval"], "latency_distribution_w_warmup")).values()]),
+#     # sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval_small", batch_size_dict["HumanEval_small"], "latency_distribution_w_warmup")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("S2ST", batch_size_dict["S2ST"], "latency_distribution_w_warmup")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("S2TT", batch_size_dict["S2TT"], "latency_distribution_w_warmup")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("T2ST", batch_size_dict["T2ST"], "latency_distribution_w_warmup")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("T2TT", batch_size_dict["T2TT"], "latency_distribution_w_warmup")).values()]),
+# ]
 
 
-torch_compile = [
-    sum([np.average(v[5:]) for v in get_latency(get_folder("MSCOCO", 8, "torch_compile")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("Vizwiz", 8, "torch_compile")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("Coco_Image", 8, "torch_compile")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval", 1, "torch_compile")).values()]),
-    # sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval_small", 4, "torch_compile")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("S2ST", 64, "torch_compile")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("S2TT", 64, "torch_compile")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("T2ST", 64, "torch_compile")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("T2TT", 64, "torch_compile")).values()]),
-]
+# torch_compile = [
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("MSCOCO", batch_size_dict["MSCOCO"], "torch_compile")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("Vizwiz", batch_size_dict["Vizwiz"], "torch_compile")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("Coco_Image", batch_size_dict["Coco_Image"], "torch_compile")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("Coco_Image_small", batch_size_dict["Coco_Image_small"], "torch_compile")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval", batch_size_dict["HumanEval"], "torch_compile")).values()]),
+#     # sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval_small", 4, "torch_compile")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("S2ST", batch_size_dict["S2ST"], "torch_compile")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("S2TT", batch_size_dict["S2TT"], "torch_compile")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("T2ST", batch_size_dict["T2ST"], "torch_compile")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("T2TT", batch_size_dict["T2TT"], "torch_compile")).values()]),
+# ]
 
 
-torch_compile_autoquant = [
-    sum([np.average(v[5:]) for v in get_latency(get_folder("MSCOCO", 8, "torch_compile_autoquant")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("Vizwiz", 8, "torch_compile_autoquant")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("Coco_Image", 8, "torch_compile_autoquant")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval", 1, "torch_compile_autoquant")).values()]),
-    # sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval_small", 4, "torch_compile_autoquant")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("S2ST", 64, "torch_compile_autoquant")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("S2TT", 64, "torch_compile_autoquant")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("T2ST", 64, "torch_compile_autoquant")).values()]),
-    sum([np.average(v[5:]) for v in get_latency(get_folder("T2TT", 64, "torch_compile_autoquant")).values()]),
-]
+# torch_compile_autoquant = [
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("MSCOCO", batch_size_dict["MSCOCO"], "torch_compile_autoquant")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("Vizwiz", batch_size_dict["Vizwiz"], "torch_compile_autoquant")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("Coco_Image", batch_size_dict["Coco_Image"], "torch_compile_autoquant")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("Coco_Image_small", batch_size_dict["Coco_Image_small"], "torch_compile_autoquant")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval", batch_size_dict["HumanEval"], "torch_compile_autoquant")).values()]),
+#     # sum([np.average(v[5:]) for v in get_latency(get_folder("HumanEval_small", 4, "torch_compile_autoquant")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("S2ST", batch_size_dict["S2ST"], "torch_compile_autoquant")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("S2TT", batch_size_dict["S2TT"], "torch_compile_autoquant")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("T2ST", batch_size_dict["T2ST"], "torch_compile_autoquant")).values()]),
+#     sum([np.average(v[5:]) for v in get_latency(get_folder("T2TT", batch_size_dict["T2TT"], "torch_compile_autoquant")).values()]),
+# ]
   
 # create data 
 x = np.arange(len(baseline)) 
@@ -128,6 +158,7 @@ plt.bar(x+0.2, torch_compile_autoquant, width, color='green')
 plt.xticks(x, ['MSCOCO', 
                 'Vizwiz',
                 'Coco_Image',
+                'Coco_Image_small',
                'HumanEval', 
             #    'HumanEval_small', 
                'S2ST', 
