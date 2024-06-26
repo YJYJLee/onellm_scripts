@@ -1362,7 +1362,6 @@ elif args.export:
 
         if num_sample == 0:
             print("Folder doesn't exists!!!! ", fp)
-            exit(0)
         for sample_id in range(warmup, warmup+num_sample):
             if "txt_to_img" in fp:
                 _sample_breakdown = dict()
