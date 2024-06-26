@@ -21,6 +21,7 @@ from matplotlib import colormaps
 import re
 import glob
 import pickle
+from tqdm import tqdm
 
 DIR_PREFIX="./onellm_scripts/data_for_paper/pickle_dumps/"
 
@@ -1272,130 +1273,87 @@ elif args.multigpu and args.batch_size:
     # graph_overall_grouped(overall_latency_breakdown, BATCH_SIZE, "\n\nbatch_size", save_folder_path, secondary_xlabel=NGPU_NNODE)
     graph_overall_grouped(overall_latency_breakdown, NGPU_NNODE, "\n\nBatch size", save_folder_path, secondary_xlabel=BATCH_SIZE)
 elif args.export:
-    # file_paths = list()
-    # desired_prefixes_list = list()
-    # batch_size_list = [1,4,8,16,32,64,128]
-    # # Chameleon-34B (ImgTxt2Txt)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    # # Chameleon-34B (Img2Txt)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    # # Chameleon-34B (Txt2Img)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
-    # # Chameleon-7B (ImgTxt2Txt)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".textvqa.0_shot.cm3v2_template/")
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".okvqa.0_shot.cm3v2_template/")
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".vizwiz.0_shot.cm3v2_template/")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    # # Chameleon-7B (Img2Txt)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".coco.0_shot.cm3v2_template/")
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".flickr30k.0_shot.cm3v2_template/")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    # # Chameleon-7B (Txt2Img)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".coco_image.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
-    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".partiprompts.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
-    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+    file_paths = list()
+    desired_prefixes_list = list()
+    batch_size_list = [1,4,8,16,32,64,128]
+    # Chameleon-34B (ImgTxt2Txt)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # Chameleon-34B (Img2Txt)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # Chameleon-34B (Txt2Img)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+    # Chameleon-7B (ImgTxt2Txt)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".textvqa.0_shot.cm3v2_template/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".okvqa.0_shot.cm3v2_template/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".vizwiz.0_shot.cm3v2_template/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # Chameleon-7B (Img2Txt)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".coco.0_shot.cm3v2_template/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".flickr30k.0_shot.cm3v2_template/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # Chameleon-7B (Txt2Img)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".coco_image.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".partiprompts.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
 
-    # # Codellama - 34B
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_"+str(bs)+"/")
-    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_"+str(bs)+"/")
-    #     desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
-    #     desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
+    # Codellama - 34B
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_"+str(bs)+"/")
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
     
-    # batch_size_list = [1,4,8,16,32,64,128,256,512]
-    # # HSTU - Triton
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/batch_size_"+str(bs)+"/")
-    #     desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
+    batch_size_list = [1,4,8,16,32,64,128,256,512]
+    # HSTU - Triton
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
 
-    # # HSTU - Pytorch
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_"+str(bs)+"/")
-    #     desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
+    # HSTU - Pytorch
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
 
-    # batch_size_list = [1,4,8,16,32,64,128,256,384]
-    # # Seamless (S2TT)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_"+str(bs)+"/")
-    #     desired_prefixes_list.append("MODULE_TorchSDPA_AG*MODULE_GLU_AG*MODULE_SiLU_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ReLU_AG*MODULE_Conv1d_AG*MODULE_Linear_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_Dropout_AG*MODULE_StandardEmbedding_AG*MODULE_StandardLayerNorm_AG*MODULE_TiedProjection_AG")
-    # # Seamless (S2ST)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2ST/batch_size_"+str(bs)+"/")
-    #     desired_prefixes_list.append("MODULE_StandardLayerNorm_AG*MODULE_SiLU_AG*MODULE_Dropout_AG*MODULE_TiedProjection_AG*MODULE_Conv1d_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_ConvTranspose1d_AG*MODULE_GLU_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Masked_Select_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_HardUpsampling_AG*MODULE_TorchSDPA_AG*MODULE_StandardEmbedding_AG*MODULE_Linear_AG")
-    # # Seamless (T2TT)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2TT/batch_size_"+str(bs)+"/")
-    #     desired_prefixes_list.append("MODULE_Dropout_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_ReLU_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Linear_AG*MODULE_TorchSDPA_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG")
-    # # Seamless (T2ST)
-    # for bs in batch_size_list:
-    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_"+str(bs)+"/")
-    #     desired_prefixes_list.append("MODULE_HardUpsampling_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ConvTranspose1d_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Linear_AG*MODULE_Masked_Select_AG*MODULE_Dropout_AG*MODULE_TorchSDPA_AG*MODULE_Conv1d_AG")
+    batch_size_list = [1,4,8,16,32,64,128,256,384]
+    # Seamless (S2TT)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_TorchSDPA_AG*MODULE_GLU_AG*MODULE_SiLU_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ReLU_AG*MODULE_Conv1d_AG*MODULE_Linear_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_Dropout_AG*MODULE_StandardEmbedding_AG*MODULE_StandardLayerNorm_AG*MODULE_TiedProjection_AG")
+    # Seamless (S2ST)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2ST/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_StandardLayerNorm_AG*MODULE_SiLU_AG*MODULE_Dropout_AG*MODULE_TiedProjection_AG*MODULE_Conv1d_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_ConvTranspose1d_AG*MODULE_GLU_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Masked_Select_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_HardUpsampling_AG*MODULE_TorchSDPA_AG*MODULE_StandardEmbedding_AG*MODULE_Linear_AG")
+    # Seamless (T2TT)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2TT/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_Dropout_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_ReLU_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Linear_AG*MODULE_TorchSDPA_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG")
+    # Seamless (T2ST)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_HardUpsampling_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ConvTranspose1d_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Linear_AG*MODULE_Masked_Select_AG*MODULE_Dropout_AG*MODULE_TorchSDPA_AG*MODULE_Conv1d_AG")
 
-    file_paths=[
-        # HSTU
-        "/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_32/",
-        # Chameleon (ImgTxt2Txt)
-        "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
-        # # Chameleon (Img2Txt)
-        "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
-        # # Chameleon (Txt2Img)
-        # "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.16.en.image_gen.g.True/%j/",
-        # Codellama
-        "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_4/",
-        # # Codellama
-        # "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_16/"
-        # Seamless (S2TT)
-        "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_128/",
-        # Seamless (S2ST)
-        "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2ST/batch_size_128/",
-        # Seamless (T2TT)
-        "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2TT/batch_size_384/",
-        # Seamless (T2ST)
-        "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_384/",
-    ]
-    desired_prefixes_list=[
-        # HSTU
-        "MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG",
-        # Chameleon (ImgTxt2Txt)
-        "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
-        # Chameleon (Img2Txt)
-        "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
-        # # Chameleon (Txt2Img)
-        # "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG",
-        # Codellama
-        "MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG*MODULE_SCORING_AG",
-        # # Seamless (S2TT)
-        "MODULE_TorchSDPA_AG*MODULE_GLU_AG*MODULE_SiLU_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ReLU_AG*MODULE_Conv1d_AG*MODULE_Linear_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_Dropout_AG*MODULE_StandardEmbedding_AG*MODULE_StandardLayerNorm_AG*MODULE_TiedProjection_AG",
-        # Seamless (S2ST)
-        "MODULE_StandardLayerNorm_AG*MODULE_SiLU_AG*MODULE_Dropout_AG*MODULE_TiedProjection_AG*MODULE_Conv1d_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_ConvTranspose1d_AG*MODULE_GLU_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Masked_Select_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_HardUpsampling_AG*MODULE_TorchSDPA_AG*MODULE_StandardEmbedding_AG*MODULE_Linear_AG",
-        # Seamless (T2TT)
-        "MODULE_Dropout_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_ReLU_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Linear_AG*MODULE_TorchSDPA_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG",
-        # Seamless (T2ST)
-        "MODULE_HardUpsampling_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ConvTranspose1d_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Linear_AG*MODULE_Masked_Select_AG*MODULE_Dropout_AG*MODULE_TorchSDPA_AG*MODULE_Conv1d_AG"
-    ]
-
-    for idx, (fp, dp) in enumerate(zip(file_paths, desired_prefixes_list)):
+    for idx, (fp, dp) in tqdm(enumerate(zip(file_paths, desired_prefixes_list))):
         desired_prefixes = list(set(dp.split("*")))
         sample_breakdown = dict()
 
