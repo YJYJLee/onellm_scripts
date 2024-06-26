@@ -574,11 +574,11 @@ def wrapup_graph(plt, ax, exp_name, xlabel, yaxis_title, title, save_folder_path
 
     plt.grid(lw=0.2)
     ax.set_axisbelow(True)
-    plt.show()
 
     file_path = save_folder_path+re.sub(" ", "", re.sub("\n", "", exp_name))+filename if not file_name_passed else save_folder_path
     plt.savefig(file_path, dpi=dpi, bbox_inches = 'tight')
     print("graph_path = ", file_path)
+    plt.show()
 
 def graph_gpu_kernel_breakdown(kernel_breakdown, save_folder_path):
     fig, ax, dpi = prep_graph()
@@ -1567,8 +1567,9 @@ elif args.figure1_separate:
         desired_prefixes = list(set(dp.split("*")))
         sample_breakdown = dict()
 
-        warmup=15 if len([path for path in glob.glob(fp+"/profile_sample_15*")]) > 0 else (0 if "hstu" in fp or fp == "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/" else 1)
-        num_sample = 3 if "txt_to_img" in fp else len([path for path in glob.glob(fp+"/profile_sample*")])
+
+        warmup=15 if len([path for path in glob.glob(DIR_PREFIX+fp+"/profile_sample_15*")]) > 0 else (0 if "hstu" in fp or fp == "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/" else 1)
+        num_sample = 3 if "txt_to_img" in fp else len([path for path in glob.glob(DIR_PREFIX+fp+"/profile_sample*")])
         
         for sample_id in range(warmup, warmup+num_sample):
             if "txt_to_img" in fp:
@@ -1679,8 +1680,8 @@ elif args.figure1_separate:
 
     assert prefill_overall_breakdown.keys() == decode_overall_breakdown.keys()
 
-    graph_overall_compare_separate(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "/fsx-atom/yejinlee/analysis_figures/breakdown/separate_overall_breakdown.pdf", file_name_passed=True)
-    graph_overall_compare_separate_ratio(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "/fsx-atom/yejinlee/analysis_figures/breakdown/separate_overall_breakdown_ratio.pdf", file_name_passed=True)
+    graph_overall_compare_separate(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "./onellm_scripts/analysis_figures/breakdown/separate_overall_breakdown.pdf", file_name_passed=True)
+    graph_overall_compare_separate_ratio(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "./onellm_scripts/analysis_figures/breakdown/separate_overall_breakdown_ratio.pdf", file_name_passed=True)
 
 else:
     folder_name_split = args.json_file.split("/")
