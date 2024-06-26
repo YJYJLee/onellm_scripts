@@ -1,0 +1,2 @@
+Encoder	Decoder	Decode	NART_Encoder	NART_Decoder	Vocoder
+1036	1	67	67	67	697

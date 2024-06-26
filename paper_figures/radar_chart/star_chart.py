@@ -8,6 +8,8 @@ from math import nan, isnan, ceil
 import math
 
 # DIR_PREFIX=""
+DIR_PREFIX="./onellm_scripts/data_for_paper/radar_chart/"
+
 class Radar(object):
     def __init__(self, figure, title, labels=None, rect=None):
         if rect is None:
@@ -153,6 +155,28 @@ if __name__ == '__main__':
 
             return np.average(mem)
 
+        # def get_latency(file_path):
+        #     file_path += "/timer_result.txt"
+        #     timer_result = dict()
+        #     if os.path.isfile(file_path):
+        #         f = open(file_path, "r")
+        #         print("Reading from ", file_path)
+        #         headers = None
+        #         for idx, sl in enumerate(f):
+        #             if idx==0:
+        #                 headers = re.sub("\n", "", sl).split("\t")
+        #                 for h in headers:
+        #                     timer_result[h] = list()
+        #             else:
+        #                 slsl = [float(s) for s in re.sub("\n", "", sl).split("\t") if s!=""]
+        #                 for idx, h in enumerate(headers):
+        #                     # timer_result[h].append(slsl[idx] if not log else np.log(slsl[idx]))
+        #                     timer_result[h].append(slsl[idx])
+        #     else:
+        #         print("File doesn't exist: " + file_path)
+        #     return timer_result
+
+
         def get_latency(file_path):
             file_path += "/timer_result.txt"
             timer_result = dict()
@@ -160,24 +184,31 @@ if __name__ == '__main__':
                 f = open(file_path, "r")
                 print("Reading from ", file_path)
                 headers = None
+                num_line = 0
                 for idx, sl in enumerate(f):
                     if idx==0:
                         headers = re.sub("\n", "", sl).split("\t")
                         for h in headers:
                             timer_result[h] = list()
                     else:
+                        if "Total" in sl and idx%2==0:
+                            continue
                         slsl = [float(s) for s in re.sub("\n", "", sl).split("\t") if s!=""]
                         for idx, h in enumerate(headers):
-                            timer_result[h].append(slsl[idx] if not log else np.log(slsl[idx]))
+                            timer_result[h].append(slsl[idx])
+                        num_line+=1
+                return timer_result
+
             else:
                 print("File doesn't exist: " + file_path)
-            return timer_result
+                return None
+
 
         def collect_data(dataset, bs, model=None, n_layer=-1):
             working_dir = get_folder(dataset, bs)
             get_seq_len(working_dir, model=model)
             get_memory_capacity(working_dir)
-            get_latency(working_dir).values()
+            get_latency(get_timing_folder(dataset, bs))
             get_gpu_util(working_dir)
             return
 
@@ -255,6 +286,78 @@ if __name__ == '__main__':
                 return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/sweep/batch_size_"+str(bs)+"/"
             else:
                 assert False
+
+        def get_timing_folder(dataset, bs):
+            # if dataset == "MSCOCO":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            # elif dataset == "Flickr30k":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            # elif dataset == "TextVQA":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            # elif dataset == "OKVQA":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            # elif dataset == "Vizwiz":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            # elif dataset == "Hellaswag":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.hellaswag."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
+            # elif dataset == "Arc_easy":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.arc_easy."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
+            # elif dataset == "HumanEval":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/HumanEval_codellama/batch_size_"+str(bs)
+            # elif dataset == "MBPP":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/MBPP_codellama/batch_size_"+str(bs)
+            # elif dataset == "Coco_Image":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+            # elif dataset == "Partiprompts":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+            # elif dataset == "S2ST":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/S2ST/batch_size_"+str(bs)+"/"
+            # elif dataset == "S2TT":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/S2TT/batch_size_"+str(bs)+"/"
+            # elif dataset == "T2ST":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/T2ST/batch_size_"+str(bs)+"/"
+            # elif dataset == "T2TT":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/T2TT/batch_size_"+str(bs)+"/"
+            # elif dataset == "HSTU-Pytorch":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/sweep/pytorch/batch_size_"+str(bs)+"/"
+            # elif dataset == "HSTU-Triton":
+            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/sweep/batch_size_"+str(bs)+"/"
+            # else:
+            #     assert False
+
+            if dataset == "MSCOCO":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            elif dataset == "Flickr30k":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            elif dataset == "TextVQA":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            elif dataset == "OKVQA":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            elif dataset == "Vizwiz":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+            elif dataset == "Coco_Image":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+            elif dataset == "Partiprompts":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts.0_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+            elif dataset == "HumanEval":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/HumanEval_codellama/meta-llama/CodeLlama-34b-hf/batch_size_"+str(bs)+"/"
+            elif dataset == "MBPP":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/MBPP_codellama/meta-llama/CodeLlama-34b-hf/batch_size_"+str(bs)+"/"
+            elif dataset == "S2ST":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/S2ST/batch_size_"+str(bs)+"/"
+            elif dataset == "S2TT":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/S2TT/batch_size_"+str(bs)+"/"
+            elif dataset == "T2ST":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/T2ST/batch_size_"+str(bs)+"/"
+            elif dataset == "T2TT":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/T2TT/batch_size_"+str(bs)+"/"
+            elif dataset == "HSTU-Pytorch":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/latency_distribution/pytorch/batch_size_"+str(bs)+"/"
+            elif dataset == "HSTU-Triton":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/latency_distribution/batch_size_"+str(bs)+"/"
+            else:
+                assert False
+
 
         # def get_seq_len_folder(dataset):
         #     if dataset == "MSCOCO":

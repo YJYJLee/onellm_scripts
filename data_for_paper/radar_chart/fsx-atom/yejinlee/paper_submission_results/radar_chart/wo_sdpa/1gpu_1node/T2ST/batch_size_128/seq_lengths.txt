@@ -1,0 +1,7 @@
+Encoder	Decoder	Decode	NART_Encoder	NART_Decoder	Vocoder
+47	1	63	63	63	695
+65	1	80	80	80	779
+80	1	94	94	94	1030
+73	1	86	86	86	958
+55	1	64	64	64	746
+35	1	39	39	39	502

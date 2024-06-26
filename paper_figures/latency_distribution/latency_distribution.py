@@ -162,4 +162,4 @@ plot_latency_histogram("T2ST")
 plot_latency_histogram("T2TT")
 plot_latency_histogram("HSTU-Pytorch")
 plot_latency_histogram("HSTU-Triton")
-# %%
+%%
