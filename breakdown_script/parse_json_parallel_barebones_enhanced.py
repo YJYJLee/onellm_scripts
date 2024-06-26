@@ -1321,8 +1321,9 @@ elif args.export:
     for bs in batch_size_list:
         file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_"+str(bs)+"/")
         file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_"+str(bs)+"/")
-        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
-        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG*MODULE_SCORING_AG")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG*MODULE_SCORING_AG")
+        
     
     batch_size_list = [1,4,8,16,32,64,128,256,512]
     # HSTU - Triton
@@ -1518,10 +1519,10 @@ elif args.figure1_separate:
         "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
         # Chameleon (Txt2Img)
         "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.16.en.image_gen.g.True/%j/",
-        # Codellama
-        "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_4/",
         # # Codellama
-        # "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_16/"
+        # "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_4/",
+        # Codellama
+        "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_16/",
         # HSTU
         "/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_32/",
         # Seamless (S2TT)
@@ -1627,7 +1628,6 @@ elif args.figure1_separate:
 
             print("prefill: ", prefill_breakdown)
             print("decode: ", decode_breakdown)
-
             # sample_breakdown = {k: [np.average(v)] for k, v in sample_breakdown.items()}
 
             # dp_collection = dp_collection.union(set(sample_breakdown.keys()))
