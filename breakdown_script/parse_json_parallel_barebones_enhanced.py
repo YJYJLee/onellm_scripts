@@ -22,6 +22,8 @@ import re
 import glob
 import pickle
 
+DIR_PREFIX="./onellm_scripts/data_for_paper/pickle_dumps/"
+
 # Initialize ArgParser:
 parser = argparse.ArgumentParser("argparser")
 
@@ -37,8 +39,9 @@ parser.add_argument("--compare-dir", type=str, default="")
 parser.add_argument("--multigpu", action="store_true", default=False)
 parser.add_argument("--simplify", action="store_true", default=False)
 parser.add_argument("--figure1", action="store_true", default=False)
-parser.add_argument("--figure1_seperate", action="store_true", default=False)
+parser.add_argument("--figure1_separate", action="store_true", default=False)
 parser.add_argument("--export", action="store_true", default=False)
+parser.add_argument("--import_pickle", action="store_true", default=False)
 
 
 # Get arguments into readable format:
@@ -46,7 +49,7 @@ args = parser.parse_args()
 print("Finish parsing arguments")
 print("args = ", args)
 
-FONTSIZE=6 if args.figure1 or args.figure1_seperate else 26
+FONTSIZE=6 if args.figure1 or args.figure1_separate else 26
 
 prefix = "AG"
 
@@ -61,6 +64,87 @@ top_prefixes = ["DENOISING_LOOP"]
 ############################################################################################################################################
 ############################################################################################################################################
 ############################################################################################################################################
+    
+def process_kernel_breakdown(kernel_breakdown, decoding_step_time, gpu_operation_time_per_decoding_step, max_kernel, min_kernel, plot_graph):
+
+    if "MODULE_ColumnParallelLinear_AG" in kernel_breakdown and "MODULE_RowParallelLinear_AG" in kernel_breakdown:
+        kernel_breakdown["Linear"] = [a+b for a,b in zip(kernel_breakdown["MODULE_ColumnParallelLinear_AG"], kernel_breakdown["MODULE_RowParallelLinear_AG"])]
+        del kernel_breakdown["MODULE_ColumnParallelLinear_AG"]
+        del kernel_breakdown["MODULE_RowParallelLinear_AG"]
+
+    if "MODULE_ToMe_Merge_AG" in kernel_breakdown:
+        kernel_breakdown["MODULE_ToMe_Merge_AG"] = [0]*(len(kernel_breakdown["Misc"])-len(kernel_breakdown["MODULE_ToMe_Merge_AG"])) + kernel_breakdown["MODULE_ToMe_Merge_AG"]
+
+    if "MODULE_LOG_SOFTMAX_AG" in kernel_breakdown:
+        kernel_breakdown["MODULE_SCORING_AG"] = kernel_breakdown.pop("MODULE_LOG_SOFTMAX_AG")
+
+    # if sum(communication_list) > 0:
+    #     kernel_breakdown["Communication"] = communication_list
+
+    new_kernel_breakdown = dict()
+    for k, v  in kernel_breakdown.items():
+        new_kernel_breakdown[re.sub("POST_PROC_IMAGE_DECODE", "(Postprocessing) Decode Image", re.sub("POSTPROC_GENERATE_TEXT", "(Postprocessing) Generate Text", (re.sub("PREPROC_ENCODE_IMAGES", "(Preprocessing) Encode Image", re.sub("SCORING", "Scoring", re.sub("_AG", "", re.sub("MODULE_", "", k)))))))] = v
+    del kernel_breakdown
+    kernel_breakdown = new_kernel_breakdown
+
+    def merge_values(kernel_breakdown, org_k, new_k):
+        assert org_k != new_k
+        if org_k in kernel_breakdown:
+            if new_k in kernel_breakdown:
+                kernel_breakdown[new_k] = [a+b for a, b in zip(kernel_breakdown[new_k], kernel_breakdown[org_k])]
+                del kernel_breakdown[org_k]
+            else:
+                kernel_breakdown[new_k] = kernel_breakdown.pop(org_k)
+        return kernel_breakdown
+    
+    kernel_breakdown = merge_values(kernel_breakdown, "LlamaRotaryEmbedding", "Embedding")
+    kernel_breakdown = merge_values(kernel_breakdown, "ParallelEmbedding", "Embedding")
+    kernel_breakdown = merge_values(kernel_breakdown, "StandardEmbedding", "Embedding")
+    kernel_breakdown = merge_values(kernel_breakdown, "_InnerAttention", "Attention")
+    kernel_breakdown = merge_values(kernel_breakdown, "TorchSDPA", "Attention")
+    # kernel_breakdown = merge_values(kernel_breakdown, "SequentialTransductionUnit", "Attention")
+    kernel_breakdown = merge_values(kernel_breakdown, "_RaggedAttentionRelativeBiasFunction", "Attention")
+    kernel_breakdown = merge_values(kernel_breakdown, "Sigmoid", "Activation")
+    kernel_breakdown = merge_values(kernel_breakdown, "GLU", "Activation")
+    kernel_breakdown = merge_values(kernel_breakdown, "ReLU", "Activation")
+    kernel_breakdown = merge_values(kernel_breakdown, "SiLU", "Activation")
+    kernel_breakdown = merge_values(kernel_breakdown, "StandardLayerNorm", "LayerNorm")
+    kernel_breakdown = merge_values(kernel_breakdown, "FusedRMSNorm", "LayerNorm")
+    kernel_breakdown = merge_values(kernel_breakdown, "LlamaRMSNorm", "LayerNorm")
+    kernel_breakdown = merge_values(kernel_breakdown, "RMSNorm", "LayerNorm")
+    kernel_breakdown = merge_values(kernel_breakdown, "TiedProjection", "Linear")
+    kernel_breakdown = merge_values(kernel_breakdown, "ConvTranspose1d", "Conv1d")
+
+    if plot_graph:
+        graph_gpu_kernel_breakdown(kernel_breakdown, save_folder_path)
+
+    idle_list = list()
+    if len(decoding_step_time)>0:
+        print(len(kernel_breakdown["Scoring"]))
+        for s in np.arange(len(kernel_breakdown["Scoring"])):
+            print("Step ", s, decoding_step_time[s], " / ", gpu_operation_time_per_decoding_step[s])
+            assert gpu_operation_time_per_decoding_step[s] >= 0
+            idle_list.append(gpu_operation_time_per_decoding_step[s])
+    else:
+        # end_kernel = gpu_kernels_dict[gpu_launch_kernels[-1]['args']['External id']]
+        end_kernel = max_kernel
+        # print("END", end_kernel)
+        # print("START", gpu_launch_kernels[0])
+        # print((end_kernel['ts']+end_kernel['dur']-gpu_launch_kernels[0]['ts'])/1000)
+
+        # assert (end_kernel['ts']+end_kernel['dur']-gpu_launch_kernels[0]['ts'])/1000-sum([sum(v) for v in kernel_breakdown.values()]) >= 0
+        # idle_list.append((end_kernel['ts']+end_kernel['dur']-gpu_launch_kernels[0]['ts'])/1000-sum([sum(v) for v in kernel_breakdown.values()]))
+        assert (end_kernel['ts']+end_kernel['dur']-min_kernel['ts'])/1000-sum([sum(v) for v in kernel_breakdown.values()]) >= 0
+        idle_list.append((end_kernel['ts']+end_kernel['dur']-min_kernel['ts'])/1000-sum([sum(v) for v in kernel_breakdown.values()]))
+
+    kernel_breakdown["Idle"] = idle_list
+
+    if plot_graph: 
+        graph_gpu_kernel_breakdown_idle(kernel_breakdown, save_folder_path)
+
+    return kernel_breakdown
+
+
 def parse_file(file_path, save_folder_path=None, plot_graph=True):
     kernel_breakdown = {}
     desired_prefixes_gpu_dur = []
@@ -387,82 +471,20 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
         dump_dir = './onellm_scripts/data_for_paper/pickle_dumps/'+"/".join(file_path.split("/")[:-1])
         os.makedirs(dump_dir, exist_ok=True)
         file_path = dump_dir+"/"+file_path.split("/")[-1]+'.pickle'
+        dump_dict = {
+            'kernel_breakdown': kernel_breakdown,
+            'decoding_step_time': decoding_step_time,
+            'gpu_operation_time_per_decoding_step': gpu_operation_time_per_decoding_step,
+            'max_kernel': gpu_kernels_dict[gpu_launch_kernels[-1]['args']['External id']],
+            'min_kernel': gpu_launch_kernels[0],
+        }
         with open(file=file_path, mode='wb') as f:
-            pickle.dump(kernel_breakdown, f)
+            pickle.dump(dump_dict, f)
         print("Written to ", file_path)
         return
 
-    if "MODULE_ColumnParallelLinear_AG" in kernel_breakdown and "MODULE_RowParallelLinear_AG" in kernel_breakdown:
-        kernel_breakdown["Linear"] = [a+b for a,b in zip(kernel_breakdown["MODULE_ColumnParallelLinear_AG"], kernel_breakdown["MODULE_RowParallelLinear_AG"])]
-        del kernel_breakdown["MODULE_ColumnParallelLinear_AG"]
-        del kernel_breakdown["MODULE_RowParallelLinear_AG"]
+    return process_kernel_breakdown(kernel_breakdown, decoding_step_time, gpu_operation_time_per_decoding_step, gpu_kernels_dict[gpu_launch_kernels[-1]['args']['External id']], gpu_launch_kernels[0], plot_graph=plot_graph)
 
-    if "MODULE_ToMe_Merge_AG" in kernel_breakdown:
-        kernel_breakdown["MODULE_ToMe_Merge_AG"] = [0]*(len(kernel_breakdown["Misc"])-len(kernel_breakdown["MODULE_ToMe_Merge_AG"])) + kernel_breakdown["MODULE_ToMe_Merge_AG"]
-
-    if "MODULE_LOG_SOFTMAX_AG" in kernel_breakdown:
-        kernel_breakdown["MODULE_SCORING_AG"] = kernel_breakdown.pop("MODULE_LOG_SOFTMAX_AG")
-
-    if sum(communication_list) > 0:
-        kernel_breakdown["Communication"] = communication_list
-
-    new_kernel_breakdown = dict()
-    for k, v  in kernel_breakdown.items():
-        new_kernel_breakdown[re.sub("POST_PROC_IMAGE_DECODE", "(Postprocessing) Decode Image", re.sub("POSTPROC_GENERATE_TEXT", "(Postprocessing) Generate Text", (re.sub("PREPROC_ENCODE_IMAGES", "(Preprocessing) Encode Image", re.sub("SCORING", "Scoring", re.sub("_AG", "", re.sub("MODULE_", "", k)))))))] = v
-    del kernel_breakdown
-    kernel_breakdown = new_kernel_breakdown
-
-    def merge_values(kernel_breakdown, org_k, new_k):
-        assert org_k != new_k
-        if org_k in kernel_breakdown:
-            if new_k in kernel_breakdown:
-                kernel_breakdown[new_k] = [a+b for a, b in zip(kernel_breakdown[new_k], kernel_breakdown[org_k])]
-                del kernel_breakdown[org_k]
-            else:
-                kernel_breakdown[new_k] = kernel_breakdown.pop(org_k)
-        return kernel_breakdown
-    
-    kernel_breakdown = merge_values(kernel_breakdown, "LlamaRotaryEmbedding", "Embedding")
-    kernel_breakdown = merge_values(kernel_breakdown, "ParallelEmbedding", "Embedding")
-    kernel_breakdown = merge_values(kernel_breakdown, "StandardEmbedding", "Embedding")
-    kernel_breakdown = merge_values(kernel_breakdown, "_InnerAttention", "Attention")
-    kernel_breakdown = merge_values(kernel_breakdown, "TorchSDPA", "Attention")
-    kernel_breakdown = merge_values(kernel_breakdown, "SequentialTransductionUnit", "Attention")
-    kernel_breakdown = merge_values(kernel_breakdown, "Sigmoid", "Activation")
-    kernel_breakdown = merge_values(kernel_breakdown, "GLU", "Activation")
-    kernel_breakdown = merge_values(kernel_breakdown, "ReLU", "Activation")
-    kernel_breakdown = merge_values(kernel_breakdown, "SiLU", "Activation")
-    kernel_breakdown = merge_values(kernel_breakdown, "StandardLayerNorm", "LayerNorm")
-    kernel_breakdown = merge_values(kernel_breakdown, "FusedRMSNorm", "LayerNorm")
-    kernel_breakdown = merge_values(kernel_breakdown, "LlamaRMSNorm", "LayerNorm")
-    kernel_breakdown = merge_values(kernel_breakdown, "RMSNorm", "LayerNorm")
-    kernel_breakdown = merge_values(kernel_breakdown, "TiedProjection", "Linear")
-    kernel_breakdown = merge_values(kernel_breakdown, "ConvTranspose1d", "Conv1d")
-
-    if plot_graph:
-        graph_gpu_kernel_breakdown(kernel_breakdown, save_folder_path)
-
-    idle_list = list()
-    if len(decoding_step_time)>0:
-        print(len(kernel_breakdown["Scoring"]))
-        for s in np.arange(len(kernel_breakdown["Scoring"])):
-            print("Step ", s, decoding_step_time[s], " / ", gpu_operation_time_per_decoding_step[s])
-            assert gpu_operation_time_per_decoding_step[s] >= 0
-            idle_list.append(gpu_operation_time_per_decoding_step[s])
-    else:
-        end_kernel = gpu_kernels_dict[gpu_launch_kernels[-1]['args']['External id']]
-        # print("END", end_kernel)
-        # print("START", gpu_launch_kernels[0])
-        # print((end_kernel['ts']+end_kernel['dur']-gpu_launch_kernels[0]['ts'])/1000)
-        assert (end_kernel['ts']+end_kernel['dur']-gpu_launch_kernels[0]['ts'])/1000-sum([sum(v) for v in kernel_breakdown.values()]) >= 0
-        idle_list.append((end_kernel['ts']+end_kernel['dur']-gpu_launch_kernels[0]['ts'])/1000-sum([sum(v) for v in kernel_breakdown.values()]))
-
-    kernel_breakdown["Idle"] = idle_list
-
-    if plot_graph: 
-        graph_gpu_kernel_breakdown_idle(kernel_breakdown, save_folder_path)
-
-    return kernel_breakdown
 ############################################################################################################################################
 ############################################################################################################################################
 ############################################################################################################################################
@@ -547,7 +569,7 @@ def wrapup_graph(plt, ax, exp_name, xlabel, yaxis_title, title, save_folder_path
 
     plt.xticks(fontsize=FONTSIZE)
     plt.yticks(fontsize=FONTSIZE)
-    ax.tick_params(axis='x', rotation=90 if len(xlabel[-1])>8 and not args.figure1 and not args.figure1_seperate else 0)
+    ax.tick_params(axis='x', rotation=90 if len(xlabel[-1])>8 and not args.figure1 and not args.figure1_separate else 0)
 
     plt.grid(lw=0.2)
     ax.set_axisbelow(True)
@@ -748,7 +770,7 @@ def graph_overall_compare(kernel_breakdown, compare_breakdown, xlabel, exp_name,
     wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.pdf", dpi, nested=True, file_name_passed=file_name_passed)
 
 
-def graph_overall_compare_seperate(kernel_breakdown, compare_breakdown, xlabel, exp_name, save_folder_path, nested=False, file_name_passed=False):
+def graph_overall_compare_separate(kernel_breakdown, compare_breakdown, xlabel, exp_name, save_folder_path, nested=False, file_name_passed=False):
     fig, ax, dpi = prep_graph()
 
     steps_len = len(xlabel)
@@ -759,6 +781,8 @@ def graph_overall_compare_seperate(kernel_breakdown, compare_breakdown, xlabel, 
 
     shift=0.2
 
+    num_separated_bar = 3
+
     for idx, (k, v) in enumerate(kernel_breakdown.items()):
         label1=[float(xx) for xx in x.copy()]
         label2=[float(xx) for xx in x.copy()]
@@ -766,7 +790,7 @@ def graph_overall_compare_seperate(kernel_breakdown, compare_breakdown, xlabel, 
         value1 = list()
         value2 = list()
         for idxidx, vv in enumerate(kernel_breakdown[k]):
-            if idxidx<4:
+            if idxidx<num_separated_bar:
                 value1.append(vv)
                 value2.append(compare_breakdown[k][idxidx])
                 label1[idxidx] -= shift
@@ -790,8 +814,8 @@ def graph_overall_compare_seperate(kernel_breakdown, compare_breakdown, xlabel, 
     ax.legend(fontsize=4, ncol=5, bbox_to_anchor=(0.5, 1.43), loc="upper center")
 
     # ax.legend(fontsize=4)
-    xxlabel = [val for pair in zip([xx-shift for xx in x[:4]], [xx+shift for xx in x[:4]]) for val in pair]+list(x[4:])
-    plt.xticks(xxlabel, ["P", "D"]*4 + [""]*(len(x)-4), fontsize=6)
+    xxlabel = [val for pair in zip([xx-shift for xx in x[:num_separated_bar]], [xx+shift for xx in x[:num_separated_bar]]) for val in pair]+list(x[num_separated_bar:])
+    plt.xticks(xxlabel, ["P", "D"]*num_separated_bar + [""]*(len(x)-num_separated_bar), fontsize=6)
 
     sec = ax.secondary_xaxis(location=0)
     # if len(xlabel) == 20:
@@ -805,7 +829,7 @@ def graph_overall_compare_seperate(kernel_breakdown, compare_breakdown, xlabel, 
     wrapup_graph(plt, ax, "\n\n"+exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.pdf", dpi, nested=nested, file_name_passed=file_name_passed)
 
 
-def graph_overall_compare_seperate_ratio(kernel_breakdown, compare_breakdown, xlabel, exp_name, save_folder_path, nested=False, file_name_passed=False):
+def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, xlabel, exp_name, save_folder_path, nested=False, file_name_passed=False):
     fig, ax, dpi = prep_graph()
 
     steps_len = len(xlabel)
@@ -815,12 +839,12 @@ def graph_overall_compare_seperate_ratio(kernel_breakdown, compare_breakdown, xl
 
     shift=0.2
 
+    num_separated_bar = 3
     total_time = list()
     total_time_compare = list()
     for i in range(steps_len):
         total_time.append(sum([v[i] for v in kernel_breakdown.values()]))
         total_time_compare.append(sum([v[i] for v in compare_breakdown.values()]))
-
 
     for idx, (k, v) in enumerate(kernel_breakdown.items()):
         label1=[float(xx) for xx in x.copy()]
@@ -829,14 +853,14 @@ def graph_overall_compare_seperate_ratio(kernel_breakdown, compare_breakdown, xl
         value1 = list()
         value2 = list()
         for idxidx, vv in enumerate(kernel_breakdown[k]):
-            if idxidx<4:
+            if idxidx<num_separated_bar:
                 value1.append(vv/total_time[idxidx]*100)
                 value2.append(compare_breakdown[k][idxidx]/total_time_compare[idxidx]*100)
                 label1[idxidx] -= shift
                 label2[idxidx] += shift
             else:
                 value1.append(0)
-                value2.append(vv/total_time[idxidx]*100)
+                value2.append(vv/total_time[idxidx]*100 if total_time[idxidx]>0 else 0)
 
         ax.bar(label1, value1,  bottom=bottom, label=k, color=cmap[k], width=0.35)
         ax.bar(label2, value2, bottom=bottom_compare, color=cmap[k], width=0.35)
@@ -851,8 +875,8 @@ def graph_overall_compare_seperate_ratio(kernel_breakdown, compare_breakdown, xl
 
     # plt.ylim(0,50000)
     ax.legend(fontsize=4, ncol=5, bbox_to_anchor=(0.5, 1.43), loc="upper center")
-    xxlabel = [val for pair in zip([xx-shift for xx in x[:4]], [xx+shift for xx in x[:4]]) for val in pair]+list(x[4:])
-    plt.xticks(xxlabel, ["P", "D"]*4 + [""]*(len(x)-4), fontsize=6)
+    xxlabel = [val for pair in zip([xx-shift for xx in x[:num_separated_bar]], [xx+shift for xx in x[:num_separated_bar]]) for val in pair]+list(x[num_separated_bar:])
+    plt.xticks(xxlabel, ["P", "D"]*num_separated_bar + [""]*(len(x)-num_separated_bar), fontsize=6)
 
     sec = ax.secondary_xaxis(location=0)
     # if len(xlabel) == 20:
@@ -984,7 +1008,7 @@ def gather_result(profile_result, overall_breakdown, add_dummy=0, nested=False):
                 overall_breakdown[k].append(0)
     return 0
 
-def gather_result_seperate(profile_result, overall_breakdown, add_dummy=0, nested=False, merge_sample=False):
+def gather_result_separate(profile_result, overall_breakdown, add_dummy=0, nested=False, merge_sample=False):
     if profile_result != dict():
         if len(overall_breakdown)==0:
             for k in profile_result.keys():
@@ -1248,85 +1272,128 @@ elif args.multigpu and args.batch_size:
     # graph_overall_grouped(overall_latency_breakdown, BATCH_SIZE, "\n\nbatch_size", save_folder_path, secondary_xlabel=NGPU_NNODE)
     graph_overall_grouped(overall_latency_breakdown, NGPU_NNODE, "\n\nBatch size", save_folder_path, secondary_xlabel=BATCH_SIZE)
 elif args.export:
-    file_paths = list()
-    desired_prefixes_list = list()
-    batch_size_list = [1,4,8,16,32,64,128]
-    # Chameleon-34B (ImgTxt2Txt)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    # Chameleon-34B (Img2Txt)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    # Chameleon-34B (Txt2Img)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
-    # Chameleon-7B (ImgTxt2Txt)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".textvqa.0_shot.cm3v2_template/")
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".okvqa.0_shot.cm3v2_template/")
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".vizwiz.0_shot.cm3v2_template/")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    # Chameleon-7B (Img2Txt)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".coco.0_shot.cm3v2_template/")
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".flickr30k.0_shot.cm3v2_template/")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
-    # Chameleon-7B (Txt2Img)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".coco_image.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
-        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".partiprompts.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
-        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+    # file_paths = list()
+    # desired_prefixes_list = list()
+    # batch_size_list = [1,4,8,16,32,64,128]
+    # # Chameleon-34B (ImgTxt2Txt)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # # Chameleon-34B (Img2Txt)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # # Chameleon-34B (Txt2Img)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+    # # Chameleon-7B (ImgTxt2Txt)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".textvqa.0_shot.cm3v2_template/")
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".okvqa.0_shot.cm3v2_template/")
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".vizwiz.0_shot.cm3v2_template/")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # # Chameleon-7B (Img2Txt)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".coco.0_shot.cm3v2_template/")
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".flickr30k.0_shot.cm3v2_template/")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # # Chameleon-7B (Txt2Img)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".coco_image.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
+    #     file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".partiprompts.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+    #     desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
 
-    # Codellama - 34B
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_"+str(bs)+"/")
-        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_"+str(bs)+"/")
-        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
-        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
+    # # Codellama - 34B
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_"+str(bs)+"/")
+    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_"+str(bs)+"/")
+    #     desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
+    #     desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
     
-    batch_size_list = [1,4,8,16,32,64,128,256,512]
-    # HSTU - Triton
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/batch_size_"+str(bs)+"/")
-        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
+    # batch_size_list = [1,4,8,16,32,64,128,256,512]
+    # # HSTU - Triton
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/batch_size_"+str(bs)+"/")
+    #     desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
 
-    # HSTU - Pytorch
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_"+str(bs)+"/")
-        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
+    # # HSTU - Pytorch
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_"+str(bs)+"/")
+    #     desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
 
-    batch_size_list = [1,4,8,16,32,64,128,256,384]
-    # Seamless (S2TT)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_"+str(bs)+"/")
-        desired_prefixes_list.append("MODULE_TorchSDPA_AG*MODULE_GLU_AG*MODULE_SiLU_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ReLU_AG*MODULE_Conv1d_AG*MODULE_Linear_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_Dropout_AG*MODULE_StandardEmbedding_AG*MODULE_StandardLayerNorm_AG*MODULE_TiedProjection_AG")
-    # Seamless (S2ST)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2ST/batch_size_"+str(bs)+"/")
-        desired_prefixes_list.append("MODULE_StandardLayerNorm_AG*MODULE_SiLU_AG*MODULE_Dropout_AG*MODULE_TiedProjection_AG*MODULE_Conv1d_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_ConvTranspose1d_AG*MODULE_GLU_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Masked_Select_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_HardUpsampling_AG*MODULE_TorchSDPA_AG*MODULE_StandardEmbedding_AG*MODULE_Linear_AG")
-    # Seamless (T2TT)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2TT/batch_size_"+str(bs)+"/")
-        desired_prefixes_list.append("MODULE_Dropout_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_ReLU_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Linear_AG*MODULE_TorchSDPA_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG")
-    # Seamless (T2ST)
-    for bs in batch_size_list:
-        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_"+str(bs)+"/")
-        desired_prefixes_list.append("MODULE_HardUpsampling_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ConvTranspose1d_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Linear_AG*MODULE_Masked_Select_AG*MODULE_Dropout_AG*MODULE_TorchSDPA_AG*MODULE_Conv1d_AG")
+    # batch_size_list = [1,4,8,16,32,64,128,256,384]
+    # # Seamless (S2TT)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_"+str(bs)+"/")
+    #     desired_prefixes_list.append("MODULE_TorchSDPA_AG*MODULE_GLU_AG*MODULE_SiLU_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ReLU_AG*MODULE_Conv1d_AG*MODULE_Linear_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_Dropout_AG*MODULE_StandardEmbedding_AG*MODULE_StandardLayerNorm_AG*MODULE_TiedProjection_AG")
+    # # Seamless (S2ST)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2ST/batch_size_"+str(bs)+"/")
+    #     desired_prefixes_list.append("MODULE_StandardLayerNorm_AG*MODULE_SiLU_AG*MODULE_Dropout_AG*MODULE_TiedProjection_AG*MODULE_Conv1d_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_ConvTranspose1d_AG*MODULE_GLU_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Masked_Select_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_HardUpsampling_AG*MODULE_TorchSDPA_AG*MODULE_StandardEmbedding_AG*MODULE_Linear_AG")
+    # # Seamless (T2TT)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2TT/batch_size_"+str(bs)+"/")
+    #     desired_prefixes_list.append("MODULE_Dropout_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_ReLU_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Linear_AG*MODULE_TorchSDPA_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG")
+    # # Seamless (T2ST)
+    # for bs in batch_size_list:
+    #     file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_"+str(bs)+"/")
+    #     desired_prefixes_list.append("MODULE_HardUpsampling_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ConvTranspose1d_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Linear_AG*MODULE_Masked_Select_AG*MODULE_Dropout_AG*MODULE_TorchSDPA_AG*MODULE_Conv1d_AG")
+
+    file_paths=[
+        # HSTU
+        "/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_32/",
+        # Chameleon (ImgTxt2Txt)
+        "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
+        # # Chameleon (Img2Txt)
+        "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
+        # # Chameleon (Txt2Img)
+        # "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.16.en.image_gen.g.True/%j/",
+        # Codellama
+        "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_4/",
+        # # Codellama
+        # "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_16/"
+        # Seamless (S2TT)
+        "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_128/",
+        # Seamless (S2ST)
+        "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2ST/batch_size_128/",
+        # Seamless (T2TT)
+        "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2TT/batch_size_384/",
+        # Seamless (T2ST)
+        "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_384/",
+    ]
+    desired_prefixes_list=[
+        # HSTU
+        "MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG",
+        # Chameleon (ImgTxt2Txt)
+        "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
+        # Chameleon (Img2Txt)
+        "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
+        # # Chameleon (Txt2Img)
+        # "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG",
+        # Codellama
+        "MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG*MODULE_SCORING_AG",
+        # # Seamless (S2TT)
+        "MODULE_TorchSDPA_AG*MODULE_GLU_AG*MODULE_SiLU_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ReLU_AG*MODULE_Conv1d_AG*MODULE_Linear_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_Dropout_AG*MODULE_StandardEmbedding_AG*MODULE_StandardLayerNorm_AG*MODULE_TiedProjection_AG",
+        # Seamless (S2ST)
+        "MODULE_StandardLayerNorm_AG*MODULE_SiLU_AG*MODULE_Dropout_AG*MODULE_TiedProjection_AG*MODULE_Conv1d_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_ConvTranspose1d_AG*MODULE_GLU_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Masked_Select_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_HardUpsampling_AG*MODULE_TorchSDPA_AG*MODULE_StandardEmbedding_AG*MODULE_Linear_AG",
+        # Seamless (T2TT)
+        "MODULE_Dropout_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_ReLU_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Linear_AG*MODULE_TorchSDPA_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG",
+        # Seamless (T2ST)
+        "MODULE_HardUpsampling_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ConvTranspose1d_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Linear_AG*MODULE_Masked_Select_AG*MODULE_Dropout_AG*MODULE_TorchSDPA_AG*MODULE_Conv1d_AG"
+    ]
 
     for idx, (fp, dp) in enumerate(zip(file_paths, desired_prefixes_list)):
         desired_prefixes = list(set(dp.split("*")))
@@ -1337,6 +1404,7 @@ elif args.export:
 
         if num_sample == 0:
             print("Folder doesn't exists!!!! ", fp)
+            exit(0)
         for sample_id in range(warmup, warmup+num_sample):
             if "txt_to_img" in fp:
                 _sample_breakdown = dict()
@@ -1376,7 +1444,7 @@ elif args.figure1:
         # Codellama
         "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_4/",
         # HSTU
-        "/fsx-atom/yejinlee/paper_submission_results/hstu_breakdown/1gpu_1node/batch_size_4/",
+        "/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_32/",
         # Seamless (S2TT)
         "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_128/",
         # Seamless (S2ST)
@@ -1417,7 +1485,8 @@ elif args.figure1:
         desired_prefixes = list(set(dp.split("*")))
         sample_breakdown = dict()
 
-        warmup=15 if len([path for path in glob.glob(fp+"/profile_sample_15*")]) > 0 else 1
+        # warmup=15 if len([path for path in glob.glob(fp+"/profile_sample_15*")]) > 0 else 1
+        warmup=15 if len([path for path in glob.glob(fp+"/profile_sample_15*")]) > 0 else (0 if "hstu" in fp or fp == "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/" else 1)
         # num_sample=3 if "txt_to_img" in fp or "" else 5
         num_sample = 3 if "txt_to_img" in fp else len([path for path in glob.glob(fp+"/profile_sample*")])
 
@@ -1473,11 +1542,11 @@ elif args.figure1:
     graph_overall(overall_breakdown, model_name, "Workloads", "/fsx-atom/yejinlee/analysis_figures/breakdown/overall_breakdown_wo_idle.pdf", file_name_passed=True)
     graph_overall_ratio(overall_breakdown, model_name, "Workloads", "/fsx-atom/yejinlee/analysis_figures/breakdown/overall_breakdown_wo_idle_normalized.pdf", file_name_passed=True)
 
-elif args.figure1_seperate:
+elif args.figure1_separate:
     model_name = [
         "IT-T\nCM3",
         "I-T\nCM3",
-        "T-I\nCM3",
+        # "T-I\nCM3",
         "T-T\nCodeLlama",
         "HSTU",
         "S2TT\nSeamless",
@@ -1490,14 +1559,14 @@ elif args.figure1_seperate:
         "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
         # # Chameleon (Img2Txt)
         "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
-        # Chameleon (Txt2Img)
-        "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.16.en.image_gen.g.True/%j/",
+        # # Chameleon (Txt2Img)
+        # "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.16.en.image_gen.g.True/%j/",
         # Codellama
         "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_4/",
         # # Codellama
         # "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_16/"
         # HSTU
-        "/fsx-atom/yejinlee/paper_submission_results/hstu_breakdown/1gpu_1node/batch_size_4/",
+        "/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_32/",
         # Seamless (S2TT)
         "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_128/",
         # Seamless (S2ST)
@@ -1512,8 +1581,8 @@ elif args.figure1_seperate:
         "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
         # Chameleon (Img2Txt)
         "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
-        # Chameleon (Txt2Img)
-        "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG",
+        # # Chameleon (Txt2Img)
+        # "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG",
         # Codellama
         "MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG*MODULE_SCORING_AG",
         # HSTU
@@ -1535,39 +1604,63 @@ elif args.figure1_seperate:
         prefill_overall_breakdown[k] = list()
         decode_overall_breakdown[k] = list()
 
+    assert len(file_paths)==len(desired_prefixes_list)
     for idx, (fp, dp) in enumerate(zip(file_paths, desired_prefixes_list)):
         desired_prefixes = list(set(dp.split("*")))
         sample_breakdown = dict()
 
-        warmup=15 if len([path for path in glob.glob(fp+"/profile_sample_15*")]) > 0 else 1
+        warmup=15 if len([path for path in glob.glob(fp+"/profile_sample_15*")]) > 0 else (0 if "hstu" in fp or fp == "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/" else 1)
         num_sample = 3 if "txt_to_img" in fp else len([path for path in glob.glob(fp+"/profile_sample*")])
-
+        
         for sample_id in range(warmup, warmup+num_sample):
             if "txt_to_img" in fp:
                 _sample_breakdown = dict()
                 for i in range(64,1088,64):
-                        profile_result = parse_file(fp+"profile_sample_"+str(sample_id)+"_"+str(i)+"_gpu_0.json", plot_graph=False)
-                        gather_result_seperate(profile_result, _sample_breakdown, merge_sample=True)
+                        if args.import_pickle:
+                            file_path = DIR_PREFIX+fp+"profile_sample_"+str(sample_id)+"_"+str(i)+"_gpu_0.json.pickle"
+                            if not os.path.isfile(file_path):
+                                assert False, file_path
+                            f = open(file_path,'rb')
+                            profile_result = pickle.load(f)
+                            profile_result = process_kernel_breakdown(profile_result['kernel_breakdown'], profile_result['decoding_step_time'], profile_result['gpu_operation_time_per_decoding_step'], profile_result['max_kernel'], profile_result['min_kernel'], plot_graph=False)
+                        else:
+                            profile_result = parse_file(fp+"profile_sample_"+str(sample_id)+"_"+str(i)+"_gpu_0.json", plot_graph=False)
+                        gather_result_separate(profile_result, _sample_breakdown, merge_sample=True)
                         # print(">>>> : ", _sample_breakdown)
-
-                profile_result = parse_file(fp+("image_gen/mn.cm3v21_30b_test.t.coco_image.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/" if "coco_image" in fp else "image_gen/mn.cm3v21_30b_test.t.partiprompts.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/") + "profile_sample_"+str(sample_id)+"_last_gpu_0.json", plot_graph=False)
+                if args.import_pickle:
+                    file_path = DIR_PREFIX+fp+("image_gen/mn.cm3v21_30b_test.t.coco_image.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/" if "coco_image" in fp else "image_gen/mn.cm3v21_30b_test.t.partiprompts.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/") + "profile_sample_"+str(sample_id)+"_last_gpu_0.json.pickle"
+                    if not os.path.isfile(file_path):
+                        assert False, file_path
+                    f = open(file_path, 'rb')
+                    profile_result = pickle.load(f)
+                    profile_result = process_kernel_breakdown(profile_result['kernel_breakdown'], profile_result['decoding_step_time'], profile_result['gpu_operation_time_per_decoding_step'], profile_result['max_kernel'], profile_result['min_kernel'], plot_graph=False)
+                else:
+                    profile_result = parse_file(fp+("image_gen/mn.cm3v21_30b_test.t.coco_image.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/" if "coco_image" in fp else "image_gen/mn.cm3v21_30b_test.t.partiprompts.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/") + "profile_sample_"+str(sample_id)+"_last_gpu_0.json", plot_graph=False)
                 for k, v in profile_result.items():
                     if k not in _sample_breakdown:
                         profile_result[k] = [0]*1023+v
-                gather_result_seperate(profile_result, _sample_breakdown, merge_sample=True)
+                gather_result_separate(profile_result, _sample_breakdown, merge_sample=True)
 
-                gather_result_seperate(_sample_breakdown, sample_breakdown)
+                gather_result_separate(_sample_breakdown, sample_breakdown)
                 # print("FINAL: ", sample_breakdown)
             else:
-                profile_result = parse_file(fp+"profile_sample_"+str(sample_id)+"_gpu_0.json", plot_graph=False)
+                if args.import_pickle:
+                    file_path = DIR_PREFIX+fp+"profile_sample_"+str(sample_id)+"_gpu_0.json.pickle"
+                    if not os.path.isfile(file_path):
+                        assert False, file_path
+                    f = open(file_path, "rb")
+                    profile_result = pickle.load(f)
+                    profile_result = process_kernel_breakdown(profile_result['kernel_breakdown'], profile_result['decoding_step_time'], profile_result['gpu_operation_time_per_decoding_step'], profile_result['max_kernel'], profile_result['min_kernel'], plot_graph=False)
+                else:
+                    profile_result = parse_file(fp+"profile_sample_"+str(sample_id)+"_gpu_0.json", plot_graph=False)
                 # profile_result = {'(Preprocessing) Encode Image': [15.238000000000008, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'Misc': [8.823000000000006, 0.43800000000000033, 0.4280000000000003, 0.43200000000000033, 0.4270000000000003, 0.4230000000000003, 0.4230000000000003, 0.4250000000000003, 0.43300000000000033, 0.43400000000000033], 'LayerNorm': [12.997999999999998, 3.6359999999999952, 3.5939999999999954, 3.5929999999999964, 3.5909999999999953, 3.5889999999999964, 3.584999999999997, 3.5929999999999964, 3.586999999999996, 3.5989999999999958], 'Copy': [0.352, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004], 'Scoring': [0.06300000000000001, 0.08300000000000002, 0.08200000000000002, 0.08100000000000002, 0.08300000000000003, 0.08200000000000002, 0.08100000000000002, 0.08500000000000002, 0.08300000000000002, 0.08500000000000002], 'Linear': [315.8960000000001, 40.487999999999936, 40.42199999999994, 40.40599999999994, 40.48999999999995, 40.45299999999991, 40.40899999999992, 40.46499999999993, 40.48299999999995, 40.487999999999914], 'Embedding': [0.092, 0.004, 0.003, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003], 'Attention': [26.062999999999988, 6.31099999999998, 6.221999999999979, 6.220999999999983, 6.248999999999979, 6.246999999999986, 6.252999999999983, 6.2619999999999845, 6.259999999999983, 6.255999999999982], 'Idle': [-9.727000000000032, 97.79900000000009, 92.46100000000007, 103.96900000000008, 90.72800000000007, 83.71700000000011, 107.91000000000008, 97.30100000000007, 98.40400000000008, 106.65400000000011]}
                 for idle in profile_result['Idle']:
                     assert idle >= 0, idle
-                gather_result_seperate(profile_result, sample_breakdown)
+                gather_result_separate(profile_result, sample_breakdown)
 
         # sample_breakdown = {'(Preprocessing) Encode Image': [[243.588999999995, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [243.62999999999477, 0, 0, 0, 0, 0, 0, 0, 0, 0], [243.59099999999518, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [243.6149999999951, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [243.59299999999487, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'Misc': [[151.9389999999998, 0.5760000000000004, 0.5420000000000004, 0.5380000000000004, 0.5420000000000004, 0.5400000000000004, 0.5410000000000004, 0.5390000000000004, 0.5390000000000004, 0.5360000000000004, 0.5410000000000004], [152.19400000000007, 0.5620000000000004, 0.5510000000000004, 0.5420000000000004, 0.5390000000000004, 0.5340000000000004, 0.5360000000000004, 0.5350000000000004, 0.5370000000000004, 0.5450000000000004], [152.20300000000006, 0.5430000000000004, 0.5320000000000004, 0.5400000000000004, 0.5400000000000004, 0.5380000000000004, 0.5450000000000004, 0.5390000000000004, 0.5430000000000004, 0.5390000000000004, 0.5350000000000004, 0.5470000000000004, 0.5420000000000004], [152.166, 0.5560000000000004, 0.5410000000000004, 0.5380000000000004, 0.5440000000000004, 0.5380000000000004, 0.5490000000000004, 0.5450000000000004, 0.5460000000000004, 0.5420000000000004, 0.5400000000000004, 0.5480000000000004], [152.13, 0.5530000000000004, 0.5400000000000004, 0.5440000000000004, 0.5500000000000004, 0.5400000000000004, 0.5410000000000004, 0.5520000000000004, 0.5510000000000004, 0.5450000000000004, 0.5410000000000004, 0.5450000000000004]], 'LayerNorm': [[205.73399999999978, 3.361999999999997, 3.303999999999997, 3.304999999999996, 3.3039999999999954, 3.2999999999999963, 3.3009999999999957, 3.2989999999999964, 3.2999999999999963, 3.300999999999996, 3.3089999999999957], [205.59699999999995, 3.3319999999999963, 3.301999999999995, 3.305999999999996, 3.3029999999999964, 3.3079999999999963, 3.3009999999999957, 3.3019999999999956, 3.2959999999999963, 3.299999999999997], [205.92399999999986, 3.323999999999996, 3.302999999999996, 3.303999999999996, 3.3019999999999956, 3.299999999999996, 3.307999999999996, 3.298999999999996, 3.307999999999996, 3.306999999999996, 3.333999999999995, 3.3009999999999957, 3.291999999999996], [205.5019999999999, 3.3299999999999965, 3.3009999999999957, 3.3039999999999954, 3.2929999999999953, 3.302999999999996, 3.3009999999999953, 3.3009999999999957, 3.301999999999996, 3.3079999999999954, 3.3059999999999965, 3.2999999999999954], [205.4749999999999, 3.3389999999999973, 3.3009999999999953, 3.300999999999996, 3.295999999999996, 3.2929999999999953, 3.295999999999996, 3.306999999999996, 3.3009999999999957, 3.300999999999996, 3.2999999999999954, 3.3039999999999963]], 'Copy': [[5.728, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.008, 0.007], [5.734, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007], [5.7330000000000005, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007], [5.7330000000000005, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007], [5.735000000000001, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007]], 'Scoring': [[0.14500000000000002, 0.11800000000000002, 0.11800000000000005, 0.11700000000000002, 0.11900000000000002, 0.11700000000000002, 0.12200000000000003, 0.12200000000000003, 0.12200000000000003, 0.12000000000000002, 0.12400000000000003], [0.14700000000000002, 0.11700000000000002, 0.11800000000000002, 0.11800000000000002, 0.12000000000000002, 0.12200000000000003, 0.12000000000000002, 0.12000000000000002, 0.11900000000000002, 0.12100000000000002], [0.14600000000000002, 0.11600000000000005, 0.11600000000000002, 0.12000000000000002, 0.11900000000000002, 0.12000000000000002, 0.12100000000000002, 0.11900000000000002, 0.11900000000000002, 0.12200000000000003, 0.12100000000000002, 0.12100000000000002, 0.12300000000000003], [0.14600000000000002, 0.11300000000000004, 0.11800000000000002, 0.12000000000000002, 0.12000000000000002, 0.12100000000000002, 0.12200000000000003, 0.12100000000000002, 0.12000000000000002, 0.135, 0.12000000000000002, 0.12500000000000003], [0.15300000000000002, 0.11300000000000004, 0.11300000000000002, 0.11800000000000002, 0.11900000000000002, 0.11800000000000002, 0.11700000000000002, 0.11900000000000002, 0.12000000000000002, 0.12400000000000003, 0.12700000000000003, 0.12300000000000003]], 'Linear': [[4145.686999999998, 42.18399999999999, 42.03099999999998, 42.136999999999965, 42.09999999999996, 42.17999999999997, 42.09499999999997, 42.163999999999966, 42.24399999999997, 42.12399999999995, 42.28399999999996], [4144.419000000004, 42.075999999999965, 41.43799999999997, 41.43499999999997, 41.89099999999996, 41.48299999999997, 41.74299999999997, 42.147999999999975, 42.57399999999998, 42.48599999999997], [4148.4619999999995, 42.00299999999997, 41.433999999999955, 42.25899999999994, 41.95999999999995, 42.056999999999974, 42.080999999999975, 42.27899999999997, 42.10699999999997, 41.95599999999996, 42.01599999999996, 42.32899999999995, 42.11699999999997], [4140.094, 42.160999999999966, 42.03199999999998, 42.20399999999996, 41.99999999999998, 42.16999999999996, 42.10499999999994, 42.164999999999964, 42.14599999999999, 42.145999999999944, 42.11799999999998, 42.25699999999996], [4135.796000000001, 42.417999999999964, 42.330999999999975, 42.34999999999997, 42.07699999999997, 42.134999999999955, 42.34599999999998, 42.29599999999997, 42.20099999999997, 42.273999999999965, 42.19099999999996, 42.42899999999998]], 'Embedding': [[1.4629999999999999, 0.016, 0.018, 0.016, 0.017, 0.016, 0.016, 0.016, 0.015, 0.016, 0.015], [1.468, 0.017, 0.017, 0.016, 0.017, 0.016, 0.016, 0.016, 0.017, 0.015], [1.4809999999999999, 0.017, 0.018, 0.017, 0.017, 0.015, 0.016, 0.015, 0.015, 0.015, 0.016, 0.015, 0.016], [1.4669999999999999, 0.019, 0.016, 0.017, 0.016, 0.017, 0.016, 0.016, 0.015, 0.016, 0.015, 0.015], [1.4569999999999999, 0.018, 0.015, 0.016, 0.016, 0.015, 0.016, 0.016, 0.016, 0.015, 0.016, 0.015]], 'Attention': [[396.6320000000009, 66.713, 65.36600000000001, 65.41, 65.45900000000005, 65.51700000000008, 65.56800000000005, 65.72800000000004, 65.70300000000003, 65.768, 65.83100000000007], [397.13300000000044, 66.03800000000001, 65.41499999999995, 65.45400000000004, 65.5130000000001, 65.55600000000007, 65.74700000000006, 65.71500000000003, 65.75399999999999, 65.85000000000004], [397.96100000000104, 65.82100000000001, 65.46199999999995, 65.51600000000006, 65.5610000000001, 65.64200000000007, 65.72600000000006, 65.71400000000003, 65.75999999999999, 65.82500000000003, 65.86800000000011, 65.98200000000008, 66.0060000000001], [397.6270000000004, 66.13400000000003, 65.45999999999997, 65.49400000000001, 65.5740000000001, 65.64100000000009, 65.73000000000005, 65.72300000000001, 65.78, 65.82900000000006, 65.89700000000009, 65.96600000000011], [397.55100000000044, 66.20800000000006, 65.46899999999998, 65.48900000000003, 65.5700000000001, 65.61900000000009, 65.72900000000007, 65.733, 65.77599999999994, 65.82000000000002, 65.8880000000001, 65.96600000000011]], 'Idle': [[-241.18599999999242, 73.81700000000004, 65.32200000000002, 70.19600000000005, 62.403999999999996, 73.14599999999994, 72.00999999999999, 75.22099999999999, 69.269, 87.19400000000005, 56.84799999999997], [-241.17500000000018, 94.76100000000002, 168.2050000000001, 160.96699999999998, 92.30199999999994, 144.962, 140.96499999999997, 70.08800000000001, 14.712000000000032, 41.899], [-241.17999999999574, 114.58000000000001, 169.37200000000007, 84.642, 111.04899999999995, 92.86899999999996, 103.24699999999999, 62.062, 113.62800000000004, 97.79400000000003, 107.02099999999993, 68.81699999999995, 91.02999999999993], [-241.18699999999535, 93.44200000000001, 86.95300000000006, 72.40800000000004, 90.83599999999994, 85.11699999999996, 69.44900000000004, 79.21400000000003, 86.15200000000002, 75.892, 83.32399999999993, 73.41699999999992], [-241.18999999999687, 58.14899999999999, 56.14000000000004, 64.584, 74.83599999999993, 77.87199999999996, 71.91199999999996, 76.01400000000004, 70.6440000000001, 78.11700000000002, 80.66899999999993, 68.22199999999992]]}
 
-        if idx < 4:
+        if idx < 3:
             prefill_breakdown = dict()
             decode_breakdown = dict()
             print(sample_breakdown)
@@ -1629,8 +1722,8 @@ elif args.figure1_seperate:
 
     assert prefill_overall_breakdown.keys() == decode_overall_breakdown.keys()
 
-    graph_overall_compare_seperate(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "/fsx-atom/yejinlee/analysis_figures/breakdown/seperate_overall_breakdown.pdf", file_name_passed=True)
-    graph_overall_compare_seperate_ratio(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "/fsx-atom/yejinlee/analysis_figures/breakdown/seperate_overall_breakdown_ratio.pdf", file_name_passed=True)
+    graph_overall_compare_separate(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "/fsx-atom/yejinlee/analysis_figures/breakdown/separate_overall_breakdown.pdf", file_name_passed=True)
+    graph_overall_compare_separate_ratio(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "/fsx-atom/yejinlee/analysis_figures/breakdown/separate_overall_breakdown_ratio.pdf", file_name_passed=True)
 
 else:
     folder_name_split = args.json_file.split("/")
