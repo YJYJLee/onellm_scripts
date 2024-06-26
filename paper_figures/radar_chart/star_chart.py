@@ -7,6 +7,7 @@ from matplotlib import colormaps
 from math import nan, isnan, ceil
 import math
 
+# DIR_PREFIX=""
 class Radar(object):
     def __init__(self, figure, title, labels=None, rect=None):
         if rect is None:
@@ -52,33 +53,52 @@ if __name__ == '__main__':
     
     n_gpu = 1
     num_shot = [0]
-    batch_size = [
-        {
-            'MSCOCO': 1,
-            'Vizwiz': 1,
-            'Coco_Image': 1,
-            'S2ST': 1,
-            'HumanEval': 1,
-            'MBPP': 1,
-            'HSTU': 1,
-        },
-        # {
-        #     'MSCOCO': 16,
-        #     'Vizwiz': 16,
-        #     'Coco_Image': 16,
-        #     'S2ST': 128,
-        #     'HumanEval': 16,
-        #     'MBPP': 4,
-        # }
-    ]
+    # batch_size = [
+    #     {
+    #         'MSCOCO': 1,
+    #         'Vizwiz': 1,
+    #         'Coco_Image': 1,
+    #         'S2ST': 1,
+    #         'HumanEval': 1,
+    #         'MBPP': 1,
+    #         'HSTU': 1,
+    #     },
+    #     # {
+    #     #     'MSCOCO': 16,
+    #     #     'Vizwiz': 16,
+    #     #     'Coco_Image': 16,
+    #     #     'S2ST': 128,
+    #     #     'HumanEval': 16,
+    #     #     'MBPP': 4,
+    #     # }
+    # ]
 
+    batch_size = list()
+    for bs in [1,4,8,16,32,64,128,256,384,512]:
+        batch_size.append({
+            'MSCOCO': bs,
+            'Flickr30k': bs,
+            'TextVQA': bs,
+            'OKVQA': bs,
+            'Vizwiz': bs,
+            'Coco_Image': bs,
+            'Partiprompts': bs,
+            'S2ST': bs,
+            'S2TT': bs,
+            'T2ST': bs,
+            'T2TT': bs,
+            'HumanEval': bs,
+            'MBPP': bs,
+            'HSTU': bs,
+        })
+ 
     def get_data(ns, batch_dict, log=False):
         def get_seq_len(file_path, model=None):
             file_path += "/seq_lengths.txt"
             if os.path.isfile(file_path):
                 f = open(file_path, "r")
                 print("Reading from ", file_path)
-                if model == "seamless" or "hstu" in model:
+                if model is not None and (model == "seamless" or "hstu" in model):
                     # seq_lens = dict()
                     input_seq_len = dict()
                     output_seq_len = dict()
@@ -124,6 +144,7 @@ if __name__ == '__main__':
             mem = list()
             file_path += "/memory_alloc.txt"
             if os.path.isfile(file_path):
+                print("Reading from ", file_path)
                 f = open(file_path, "r")
                 for sl in f:
                     mem.append(float(sl))
@@ -153,7 +174,12 @@ if __name__ == '__main__':
             return timer_result
 
         def collect_data(dataset, bs, model=None, n_layer=-1):
-            # seq_len_working_dir = get_seq_len_folder(dataset)
+            working_dir = get_folder(dataset, bs)
+            get_seq_len(working_dir, model=model)
+            get_memory_capacity(working_dir)
+            get_latency(working_dir).values()
+            get_gpu_util(working_dir)
+            return
 
             working_dir = get_folder(dataset, bs)
             input_seq_len, output_seq_len, decoding_steps = get_seq_len(working_dir, model=model)
@@ -194,33 +220,39 @@ if __name__ == '__main__':
 
         def get_folder(dataset, bs):
             if dataset == "MSCOCO":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
             elif dataset == "Flickr30k":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
             elif dataset == "TextVQA":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
             elif dataset == "OKVQA":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
             elif dataset == "Vizwiz":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
             elif dataset == "Hellaswag":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.hellaswag."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.hellaswag."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
             elif dataset == "Arc_easy":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.arc_easy."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.arc_easy."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
             elif dataset == "HumanEval":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/HumanEval_codellama/batch_size_"+str(bs)
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/HumanEval_codellama/batch_size_"+str(bs)
             elif dataset == "MBPP":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/MBPP_codellama/batch_size_"+str(bs)
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/MBPP_codellama/batch_size_"+str(bs)
             elif dataset == "Coco_Image":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
             elif dataset == "Partiprompts":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
             elif dataset == "S2ST":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/S2ST/batch_size_"+str(bs)+"/"
-            elif dataset == "HSTU-1M":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/HSTU/num_embeddings_1000000_batch_size_"+str(bs)+"/"
-            elif dataset == "HSTU-15M":
-                return "/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/HSTU/num_embeddings_15000000_batch_size_"+str(bs)+"/"
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/S2ST/batch_size_"+str(bs)+"/"
+            elif dataset == "S2TT":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/S2TT/batch_size_"+str(bs)+"/"
+            elif dataset == "T2ST":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/T2ST/batch_size_"+str(bs)+"/"
+            elif dataset == "T2TT":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/T2TT/batch_size_"+str(bs)+"/"
+            elif dataset == "HSTU-Pytorch":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/sweep/pytorch/batch_size_"+str(bs)+"/"
+            elif dataset == "HSTU-Triton":
+                return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/sweep/batch_size_"+str(bs)+"/"
             else:
                 assert False
 
@@ -432,7 +464,7 @@ if __name__ == '__main__':
                     flops["vocoder"]["dur_predictor"]["conv2"] = get_conv1d(1280, 1280, 3, 1)
                     flops["vocoder"]["dur_predictor"]["linear"] = bs*S
                 return flops
-            else if model == "hstu":
+            elif model == "hstu":
                 flops = dict()
                 flops["base"]
                 flops["l2"]
@@ -490,14 +522,21 @@ if __name__ == '__main__':
 
 
         data = [
-            # ('[I2T] MSCOCO', collect_data('MSCOCO', batch_dict['MSCOCO'], n_layer=48)),
-            # ('[IT2T] Vizwiz', collect_data('Vizwiz', batch_dict['Vizwiz'], n_layer=48)),
-            # ('[T2I] Coco_Image', collect_data('Coco_Image', batch_dict['Coco_Image'], n_layer=48)),
+            ('[I2T] MSCOCO', collect_data('MSCOCO', batch_dict['MSCOCO'], n_layer=48)),
+            ('[I2T] Flickr30k', collect_data('Flickr30k', batch_dict['Flickr30k'], n_layer=48)),
+            ('[IT2T] TextVQA', collect_data('TextVQA', batch_dict['TextVQA'], n_layer=48)),
+            ('[IT2T] OKVQA', collect_data('OKVQA', batch_dict['OKVQA'], n_layer=48)),
+            ('[IT2T] Vizwiz', collect_data('Vizwiz', batch_dict['Vizwiz'], n_layer=48)),
+            ('[T2I] Coco_Image', collect_data('Coco_Image', batch_dict['Coco_Image'], n_layer=48)),
+            ('[T2I] Partiprompts', collect_data('Partiprompts', batch_dict['Partiprompts'], n_layer=48)),
             ('[S2ST] Fleurs', collect_data('S2ST', batch_dict['S2ST'], model="seamless")),
-            # ('[T2T] HumanEval', collect_data('HumanEval', batch_dict['HumanEval'], model="codellama", n_layer=48)),
+            ('[S2TT] Fleurs', collect_data('S2TT', batch_dict['S2TT'], model="seamless")),
+            ('[T2TT] Fleurs', collect_data('T2TT', batch_dict['T2TT'], model="seamless")),
+            ('[T2ST] Fleurs', collect_data('T2ST', batch_dict['T2ST'], model="seamless")),
+            ('[T2T] HumanEval', collect_data('HumanEval', batch_dict['HumanEval'], model="codellama", n_layer=48)),
             ('[T2T] MBPP', collect_data('MBPP', batch_dict['MBPP'], model="codellama", n_layer=48)),
-            ('[F2F] HSTU', collect_data('HSTU-15M', batch_dict['HSTU'], model="hstu", n_layer=48)),
-            ('[F2F] HSTU', collect_data('HSTU-1M', batch_dict['HSTU'], model="hstu", n_layer=48)),
+            ('[F2F] HSTU-Pytorch', collect_data('HSTU-Pytorch', batch_dict['HSTU'], model="hstu", n_layer=48)),
+            ('[F2F] HSTU-Triton', collect_data('HSTU-Triton', batch_dict['HSTU'], model="hstu", n_layer=48)),
         ]
 
         return data

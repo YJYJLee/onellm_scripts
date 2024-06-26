@@ -5,67 +5,42 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 
+# DIR_PREFIX=""
+DIR_PREFIX="./onellm_scripts/data_for_paper/latency_dist"
+
 def get_timer_result_folder(dataset):
     if dataset == "MSCOCO":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
     elif dataset == "Flickr30k":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
     elif dataset == "TextVQA":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
     elif dataset == "OKVQA":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
     elif dataset == "Vizwiz":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
     elif dataset == "Coco_Image":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.1.en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs.1.en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
     elif dataset == "Partiprompts":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.1.en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts.0_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs.1.en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
     elif dataset == "HumanEval":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/HumanEval_codellama/batch_size_1/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/HumanEval_codellama/meta-llama/CodeLlama-34b-hf/batch_size_1/"
     elif dataset == "MBPP":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/MBPP_codellama/batch_size_1/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/MBPP_codellama/meta-llama/CodeLlama-34b-hf/batch_size_1/"
     elif dataset == "S2ST":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/S2ST/batch_size_1/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/S2ST/batch_size_1/"
     elif dataset == "S2TT":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/S2TT/batch_size_1/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/S2TT/batch_size_1/"
     elif dataset == "T2ST":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/T2ST/batch_size_1/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/T2ST/batch_size_1/"
     elif dataset == "T2TT":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/T2TT/batch_size_1/"
-    elif dataset == "HSTU":
-        return "/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/HSTU/num_embeddings_1000000_batch_size_1/"
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/T2TT/batch_size_1/"
+    elif dataset == "HSTU-Pytorch":
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/latency_distribution/pytorch/batch_size_1/"
+    elif dataset == "HSTU-Triton":
+        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/latency_distribution/batch_size_1/"
     else:
         assert False
-
-    # if dataset == "MSCOCO":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
-    # elif dataset == "Flickr30k":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
-    # elif dataset == "TextVQA":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
-    # elif dataset == "OKVQA":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
-    # elif dataset == "Vizwiz":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/"
-    # elif dataset == "Coco_Image":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.1.en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
-    # elif dataset == "Partiprompts":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.1.en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
-    # elif dataset == "HumanEval":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/HumanEval_codellama/batch_size_1/"
-    # elif dataset == "MBPP":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/MBPP_codellama/batch_size_1/"
-    # elif dataset == "S2ST":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/S2ST/batch_size_1/"
-    # elif dataset == "S2TT":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/S2TT/batch_size_1/"
-    # elif dataset == "T2ST":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/T2ST/batch_size_1/"
-    # elif dataset == "T2TT":
-    #     return "/fsx-atom/yejinlee/sweep_final/1gpu_1node/T2TT/batch_size_1/"
-    # else:
-    #     assert False
-
 
 def get_latency(file_path):
     file_path += "/timer_result.txt"
@@ -94,13 +69,14 @@ def get_latency(file_path):
 
     else:
         print("File doesn't exist: " + file_path)
-        exit(0)
+        return None
 
 
 
 def plot_latency_histogram(dataset):
     print("DATASET: ", dataset)
     latencies = get_latency(get_timer_result_folder(dataset))#[15:]
+
     # latencies.sort()
     print(latencies)
     # latencies = latencies[:-25]
@@ -156,7 +132,10 @@ def plot_latency_histogram(dataset):
     plt.legend()
     plt.title(dataset)
     plt.show()
-    fig.savefig('/fsx-atom/yejinlee/analysis_figures/latency_distribution/'+dataset+'.pdf')
+    dump_dir = './onellm_scripts/analysis_figures/latency_distribution/'
+    os.makedirs(dump_dir, exist_ok=True)
+    fig.savefig(dump_dir+dataset+'.pdf')
+    print("Saving figure to "+ dump_dir+dataset+'.pdf')
 
 
     # # Sort latencies in ascending order
@@ -168,14 +147,19 @@ def plot_latency_histogram(dataset):
     # # Retrieve the latency at that index
     # p99_latency = latencies[p99_index]
     
-# plot_latency_histogram("MSCOCO")
-# plot_latency_histogram("Vizwiz")
-# plot_latency_histogram("Coco_Image")
-# plot_latency_histogram("HumanEval")
-# plot_latency_histogram("MBPP")
-# plot_latency_histogram("S2ST")
-# plot_latency_histogram("S2TT")
-# plot_latency_histogram("T2ST")
+plot_latency_histogram("MSCOCO")
+plot_latency_histogram("Flickr30k")
+plot_latency_histogram("TextVQA")
+plot_latency_histogram("OKVQA")
+plot_latency_histogram("Vizwiz")
+plot_latency_histogram("Coco_Image")
+plot_latency_histogram("Partiprompts")
+plot_latency_histogram("HumanEval")
+plot_latency_histogram("MBPP")
+plot_latency_histogram("S2ST")
+plot_latency_histogram("S2TT")
+plot_latency_histogram("T2ST")
 plot_latency_histogram("T2TT")
-plot_latency_histogram("HSTU")
+plot_latency_histogram("HSTU-Pytorch")
+plot_latency_histogram("HSTU-Triton")
 # %%

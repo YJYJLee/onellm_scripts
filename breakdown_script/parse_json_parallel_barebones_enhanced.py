@@ -20,6 +20,7 @@ from matplotlib.lines import Line2D
 from matplotlib import colormaps
 import re
 import glob
+import pickle
 
 # Initialize ArgParser:
 parser = argparse.ArgumentParser("argparser")
@@ -37,6 +38,7 @@ parser.add_argument("--multigpu", action="store_true", default=False)
 parser.add_argument("--simplify", action="store_true", default=False)
 parser.add_argument("--figure1", action="store_true", default=False)
 parser.add_argument("--figure1_seperate", action="store_true", default=False)
+parser.add_argument("--export", action="store_true", default=False)
 
 
 # Get arguments into readable format:
@@ -60,7 +62,6 @@ top_prefixes = ["DENOISING_LOOP"]
 ############################################################################################################################################
 ############################################################################################################################################
 def parse_file(file_path, save_folder_path=None, plot_graph=True):
-    print("NOW DESIRED PREFIXES = ", desired_prefixes)
     kernel_breakdown = {}
     desired_prefixes_gpu_dur = []
 
@@ -70,6 +71,8 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
     else:
         print("File doesn't exists!!!! ", file_path)
         return kernel_breakdown
+
+    print("NOW DESIRED PREFIXES = ", desired_prefixes)
 
     print("PARSING NOW ")
     jsonString = json.load(file_p)["traceEvents"]
@@ -380,6 +383,15 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
         print(key, " = ", value)
     print("end")
     
+    if args.export:
+        dump_dir = './onellm_scripts/data_for_paper/pickle_dumps/'+"/".join(file_path.split("/")[:-1])
+        os.makedirs(dump_dir, exist_ok=True)
+        file_path = dump_dir+"/"+file_path.split("/")[-1]+'.pickle'
+        with open(file=file_path, mode='wb') as f:
+            pickle.dump(kernel_breakdown, f)
+        print("Written to ", file_path)
+        return
+
     if "MODULE_ColumnParallelLinear_AG" in kernel_breakdown and "MODULE_RowParallelLinear_AG" in kernel_breakdown:
         kernel_breakdown["Linear"] = [a+b for a,b in zip(kernel_breakdown["MODULE_ColumnParallelLinear_AG"], kernel_breakdown["MODULE_RowParallelLinear_AG"])]
         del kernel_breakdown["MODULE_ColumnParallelLinear_AG"]
@@ -1235,6 +1247,112 @@ elif args.multigpu and args.batch_size:
     os.makedirs(save_folder_path, exist_ok=True)
     # graph_overall_grouped(overall_latency_breakdown, BATCH_SIZE, "\n\nbatch_size", save_folder_path, secondary_xlabel=NGPU_NNODE)
     graph_overall_grouped(overall_latency_breakdown, NGPU_NNODE, "\n\nBatch size", save_folder_path, secondary_xlabel=BATCH_SIZE)
+elif args.export:
+    file_paths = list()
+    desired_prefixes_list = list()
+    batch_size_list = [1,4,8,16,32,64,128]
+    # Chameleon-34B (ImgTxt2Txt)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # Chameleon-34B (Img2Txt)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # Chameleon-34B (Txt2Img)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+    # Chameleon-7B (ImgTxt2Txt)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".textvqa.0_shot.cm3v2_template/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".okvqa.0_shot.cm3v2_template/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/it2t.cm3v21_109m_sft.bs"+str(bs)+".vizwiz.0_shot.cm3v2_template/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # Chameleon-7B (Img2Txt)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".coco.0_shot.cm3v2_template/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/i2t.cm3v21_109m_sft.bs"+str(bs)+".flickr30k.0_shot.cm3v2_template/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG")
+    # Chameleon-7B (Txt2Img)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".coco_image.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
+        file_paths.append("/fsx-atom/yejinlee/cm3v2_breakdown/t2i.cm3v21_109m_sft.bs"+str(bs)+".partiprompts.0_shot.cfg6.temp1.0.topp0.9.seed.1/")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+        desired_prefixes_list.append("MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG")
+
+    # Codellama - 34B
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_"+str(bs)+"/")
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG")
+    
+    batch_size_list = [1,4,8,16,32,64,128,256,512]
+    # HSTU - Triton
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
+
+    # HSTU - Pytorch
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG")
+
+    batch_size_list = [1,4,8,16,32,64,128,256,384]
+    # Seamless (S2TT)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_TorchSDPA_AG*MODULE_GLU_AG*MODULE_SiLU_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ReLU_AG*MODULE_Conv1d_AG*MODULE_Linear_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_Dropout_AG*MODULE_StandardEmbedding_AG*MODULE_StandardLayerNorm_AG*MODULE_TiedProjection_AG")
+    # Seamless (S2ST)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2ST/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_StandardLayerNorm_AG*MODULE_SiLU_AG*MODULE_Dropout_AG*MODULE_TiedProjection_AG*MODULE_Conv1d_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_ConvTranspose1d_AG*MODULE_GLU_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Masked_Select_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_HardUpsampling_AG*MODULE_TorchSDPA_AG*MODULE_StandardEmbedding_AG*MODULE_Linear_AG")
+    # Seamless (T2TT)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2TT/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_Dropout_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_ReLU_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Linear_AG*MODULE_TorchSDPA_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG")
+    # Seamless (T2ST)
+    for bs in batch_size_list:
+        file_paths.append("/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_"+str(bs)+"/")
+        desired_prefixes_list.append("MODULE_HardUpsampling_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ConvTranspose1d_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Linear_AG*MODULE_Masked_Select_AG*MODULE_Dropout_AG*MODULE_TorchSDPA_AG*MODULE_Conv1d_AG")
+
+    for idx, (fp, dp) in enumerate(zip(file_paths, desired_prefixes_list)):
+        desired_prefixes = list(set(dp.split("*")))
+        sample_breakdown = dict()
+
+        warmup=15 if len([path for path in glob.glob(fp+"/profile_sample_15*")]) > 0 else (0 if "hstu" in fp or fp == "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa.0_shot.cm3v2_template.mbs.1.umca.True.gm.text.ev.False/" else 1)
+        num_sample = 3 if "txt_to_img" in fp else len([path for path in glob.glob(fp+"/profile*.json")])
+
+        if num_sample == 0:
+            print("Folder doesn't exists!!!! ", fp)
+        for sample_id in range(warmup, warmup+num_sample):
+            if "txt_to_img" in fp:
+                _sample_breakdown = dict()
+
+                for i in range(64,1088,64):
+                    profile_result = parse_file(fp+"profile_sample_"+str(sample_id)+"_"+str(i)+"_gpu_0.json", plot_graph=False)
+
+                profile_result = parse_file(fp+("image_gen/mn.cm3v21_30b_test.t.coco_image.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/" if "coco_image" in fp else "image_gen/mn.cm3v21_30b_test.t.partiprompts.0_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/") + "profile_sample_"+str(sample_id)+"_last_gpu_0.json", plot_graph=False)
+
+
+            else:
+                if "cm3v2_breakdown/" in fp:
+                    profile_result = parse_file(fp+"profile.json", plot_graph=False)
+                else:
+                    profile_result = parse_file(fp+"profile_sample_"+str(sample_id)+"_gpu_0.json", plot_graph=False)
+
 
 elif args.figure1:
     model_name = [
@@ -1268,7 +1386,7 @@ elif args.figure1:
         # Seamless (T2ST)
         "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_384/",
     ]
-    desired_prefixes=[
+    desired_prefixes_list=[
         # Chameleon (ImgTxt2Txt)
         "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
         # Chameleon (Img2Txt)
@@ -1295,7 +1413,7 @@ elif args.figure1:
     for k in cmap.keys():
         overall_breakdown[k] = list()
 
-    for idx, (fp, dp) in enumerate(zip(file_paths, desired_prefixes)):
+    for idx, (fp, dp) in enumerate(zip(file_paths, desired_prefixes_list)):
         desired_prefixes = list(set(dp.split("*")))
         sample_breakdown = dict()
 
@@ -1389,7 +1507,7 @@ elif args.figure1_seperate:
         # Seamless (T2ST)
         "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_384/",
     ]
-    desired_prefixes=[
+    desired_prefixes_list=[
         # Chameleon (ImgTxt2Txt)
         "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
         # Chameleon (Img2Txt)
@@ -1417,7 +1535,7 @@ elif args.figure1_seperate:
         prefill_overall_breakdown[k] = list()
         decode_overall_breakdown[k] = list()
 
-    for idx, (fp, dp) in enumerate(zip(file_paths, desired_prefixes)):
+    for idx, (fp, dp) in enumerate(zip(file_paths, desired_prefixes_list)):
         desired_prefixes = list(set(dp.split("*")))
         sample_breakdown = dict()
 

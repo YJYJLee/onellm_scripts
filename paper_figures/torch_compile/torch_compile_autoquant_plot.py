@@ -8,6 +8,12 @@ import numpy as np
 n_gpu=1
 ns=0
 
+def reject_outliers(data, m=2.):
+    d = np.abs(data - np.median(data))
+    mdev = np.median(d)
+    s = d / (mdev if mdev else 1.)
+    return [a for i, a in enumerate(data) if s[i] < m ]
+
 def get_latency(file_path):
     file_path += "/timer_result.txt"
     timer_result = dict()
@@ -25,7 +31,11 @@ def get_latency(file_path):
                 for idx, h in enumerate(headers):
                     timer_result[h].append(slsl[idx])
         for k, v in timer_result.items():
-            timer_result[k].sort(reverse=True)
+            # timer_result[k].sort(reverse=True)
+            timer_result[k] = reject_outliers(v)
+        # if "vizwiz" in file_path and "compile_test" in file_path:
+        #     print(timer_result["Generation"])
+        #     exit(0)
     else:
         print("File doesn't exist: " + file_path)
     return timer_result
@@ -104,23 +114,23 @@ def plot(batch_size_dict):
     baseline = []
 
     for k, bs in batch_size_dict.items():
-        baseline.append(sum([np.average(v[5:]) for v in get_latency(get_folder(k, bs, "latency_distribution_w_warmup")).values()]))
+        baseline.append(sum([np.average(v) for v in get_latency(get_folder(k, bs, "latency_distribution_w_warmup")).values()]))
 
     # torch_compile_baseline = []
     # for k, bs in batch_size_dict.items():
-    #     torch_compile_baseline.append(sum([np.average(v[5:]) for v in get_latency(get_folder(k, bs, "torch_compile_baseline")).values()]))
+    #     torch_compile_baseline.append(sum([np.average(v) for v in get_latency(get_folder(k, bs, "torch_compile_baseline")).values()]))
 
     # torch_compile_baseline = [a/b if b>0 else (2 if a>0 else 0) for a, b in zip(torch_compile_baseline, baseline)]
 
     torch_compile = []
     for k, bs in batch_size_dict.items():
-        torch_compile.append(sum([np.average(v[5:]) for v in get_latency(get_folder(k, bs, "torch_compile")).values()]))
+        torch_compile.append(sum([np.average(v) for v in get_latency(get_folder(k, bs, "torch_compile")).values()]))
 
     torch_compile = [a/b if b>0 else (2 if a>0 else 0) for a, b in zip(torch_compile, baseline)]
 
     torch_compile_autoquant = []
     for k, bs in batch_size_dict.items():
-        torch_compile_autoquant.append(sum([np.average(v[5:]) for v in get_latency(get_folder(k, bs, "torch_compile_autoquant")).values()]))
+        torch_compile_autoquant.append(sum([np.average(v) for v in get_latency(get_folder(k, bs, "torch_compile_autoquant")).values()]))
     torch_compile_autoquant = [a/b if b>0 else (2 if a>0 else 0) for a, b in zip(torch_compile_autoquant, baseline)]
 
     baseline = [b/b if b>0 else 0 for b in baseline]
@@ -144,8 +154,10 @@ def plot(batch_size_dict):
     plt.xticks(x, list(batch_size_dict.keys()), rotation=90) 
     plt.xlabel("Workloads") 
     plt.ylabel("Normalized Speedup") 
+    plt.title("Batch Size" + str(batch_size_dict["MSCOCO-34B"]))
     # plt.legend(["Baseline", "Torch.compile Baseline", "Torch.compile", "Torch.compile+Autoquant"],ncol=4)
-    plt.legend(["Baseline", "Torch.compile", "Torch.compile+Autoquant"],ncol=3)
+    plt.legend(["Baseline", "Torch.compile", "Torch.compile+Autoquant"], ncol=3, bbox_to_anchor=(0.5, 1.15), loc="upper center")
+    
     plt.grid(lw=0.2)
     plt.savefig("/fsx-atom/yejinlee/analysis_figures/torch_compile/batch_size_"+str(batch_size_dict["MSCOCO-34B"])+".pdf", bbox_inches = 'tight')
     plt.show() 
