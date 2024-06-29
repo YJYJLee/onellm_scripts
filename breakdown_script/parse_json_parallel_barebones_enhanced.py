@@ -143,6 +143,17 @@ def process_kernel_breakdown(kernel_breakdown, decoding_step_time, gpu_operation
     if plot_graph: 
         graph_gpu_kernel_breakdown_idle(kernel_breakdown, save_folder_path)
 
+    kernel_breakdown = merge_values(kernel_breakdown, "Scoring", "Misc")
+    kernel_breakdown = merge_values(kernel_breakdown, "Copy", "Misc")
+    kernel_breakdown = merge_values(kernel_breakdown, "(Preprocessing) Encode Image", "Misc")
+    kernel_breakdown = merge_values(kernel_breakdown, "(Postprocessing) Decode Image", "Misc")
+    kernel_breakdown = merge_values(kernel_breakdown, "Activation", "Misc")
+    kernel_breakdown = merge_values(kernel_breakdown, "Wav2Vec2FbankFeatureExtractor", "Misc")
+    kernel_breakdown = merge_values(kernel_breakdown, "Masked_Select", "Misc")
+    kernel_breakdown = merge_values(kernel_breakdown, "HardUpsampling", "Misc")
+    kernel_breakdown = merge_values(kernel_breakdown, "SinusoidalPositionEncoder", "Misc")
+
+
     return kernel_breakdown
 
 
@@ -493,35 +504,30 @@ def parse_file(file_path, save_folder_path=None, plot_graph=True):
 colormap = colormaps['Set3'].colors
 colormap2 = colormaps['Paired'].colors
 
-# cmap = {"ParallelEmbedding": colormap[0],
+# cmap = {
 #     "Embedding": colormap[0],
-#     "StandardEmbedding": colormap[0],
 #     "Misc": colormap[1],
-#     "FusedRMSNorm": colormap[2],
-#     "RMSNorm": colormap[2],
-#     "Linear": colormap[3],
-#     "LayerNorm": colormap[4],
-#     "StandardLayerNorm": colormap[4],
-#     "_InnerAttention": colormap[5],
-#     "TorchSDPA": colormap[5],
-#     "Copy": colormap[7],
-#     "Scoring": colormap[8],
-#     "Idle": colormap[9],
-#     "Communication": colormap[10],
-#     "(Preprocessing) Encode Image": colormap[11],
+#     "Linear": colormap[2],
+#     "LayerNorm": colormap[3],
+#     "Attention": colormap[4],
+#     "Copy": colormap[5],
+#     "Scoring": colormap[6],
+#     "Idle": colormap[7],
+#     "Communication": colormap[8],
+#     "(Preprocessing) Encode Image": colormap[9],
 #     "(Postprocessing) Generate Text": colormap2[0],
+#     "(Postprocessing) Decode Image": colormap2[0],
 #     "Compute": colormap2[1],
-#     "Sigmoid": colormap2[2],
-#     "SiLU": colormap2[2],
-#     "GLU": colormap2[2],
-#     "ReLU": colormap2[2],
-#     "SequentialTransductionUnit": colormap2[3],
-#     "Conv1d": colormap2[4],
+#     "Activation": colormap2[2],
+#     "Conv1d": colormap2[3],
 #     "SinusoidalPositionEncoder": colormap2[5],
-#     "TiedProjection": colormap2[6],
 #     "HardUpsampling": colormap2[7],
+#     "KV_Cache_Reorder": colormap2[4],
+#     "Wav2Vec2FbankFeatureExtractor": colormap2[9],
+#     "Masked_Select": colormap2[11],
 # }
-    
+
+
 cmap = {
     "Embedding": colormap[0],
     "Misc": colormap[1],
@@ -529,21 +535,11 @@ cmap = {
     "LayerNorm": colormap[3],
     "Attention": colormap[4],
     "Copy": colormap[5],
-    "Scoring": colormap[6],
+    "Conv1d": colormap2[6],
     "Idle": colormap[7],
-    "Communication": colormap[8],
-    "(Preprocessing) Encode Image": colormap[9],
-    "(Postprocessing) Generate Text": colormap2[0],
-    "(Postprocessing) Decode Image": colormap2[0],
-    "Compute": colormap2[1],
-    "Activation": colormap2[2],
-    "Conv1d": colormap2[3],
-    "SinusoidalPositionEncoder": colormap2[5],
-    "HardUpsampling": colormap2[7],
-    "KV_Cache_Reorder": colormap2[4],
-    "Wav2Vec2FbankFeatureExtractor": colormap2[9],
-    "Masked_Select": colormap2[11],
+    "KV_Cache_Reorder": colormap[10],
 }
+
 
 def prep_graph(nested=False):
     print("GRAPHING")
@@ -771,10 +767,11 @@ def graph_overall_compare(kernel_breakdown, compare_breakdown, xlabel, exp_name,
     wrapup_graph(plt, ax, exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.pdf", dpi, nested=True, file_name_passed=file_name_passed)
 
 
-def graph_overall_compare_separate(kernel_breakdown, compare_breakdown, xlabel, exp_name, save_folder_path, nested=False, file_name_passed=False):
+def graph_overall_compare_separate(kernel_breakdown, compare_breakdown, key_order, xlabel, secondary_xlabel, exp_name, save_folder_path, nested=False, file_name_passed=False):
     fig, ax, dpi = prep_graph()
 
     steps_len = len(xlabel)
+
     # steps = np.arange(steps_len)
     bottom = [0]*steps_len
     bottom_compare = [0]*steps_len
@@ -784,7 +781,8 @@ def graph_overall_compare_separate(kernel_breakdown, compare_breakdown, xlabel, 
 
     num_separated_bar = 4
 
-    for idx, (k, v) in enumerate(kernel_breakdown.items()):
+    # for idx, (k, v) in enumerate(kernel_breakdown.items()):
+    for idx, k in enumerate(key_order):
         label1=[float(xx) for xx in x.copy()]
         label2=[float(xx) for xx in x.copy()]
 
@@ -811,31 +809,41 @@ def graph_overall_compare_separate(kernel_breakdown, compare_breakdown, xlabel, 
         # bottom = np.add(bottom, v)
         # bottom_compare = np.add(bottom_compare, compare_breakdown[k])
 
-    # plt.ylim(0,50000)
-    ax.legend(fontsize=4, ncol=5, bbox_to_anchor=(0.5, 1.43), loc="upper center")
-
-    # ax.legend(fontsize=4)
+    ax.legend(fontsize=4, ncol=8, bbox_to_anchor=(0.45, 1.1), loc="upper center")
     xxlabel = [val for pair in zip([xx-shift for xx in x[:num_separated_bar]], [xx+shift for xx in x[:num_separated_bar]]) for val in pair]+list(x[num_separated_bar:])
     plt.xticks(xxlabel, ["P", "D"]*num_separated_bar + [""]*(len(x)-num_separated_bar), fontsize=6)
+    # ax.set_xticks(ax.get_xticks()[:8])
 
     sec = ax.secondary_xaxis(location=0)
-    # if len(xlabel) == 20:
-    #     sec.set_xticks(x, labels=[xl+"        " for xl in xlabel], fontsize=6, rotation=90)
-    # else:
     sec.set_xticks(x, labels=["\n"+xl for xl in xlabel], fontsize=6)
-    sec.tick_params(bottom = False) 
+
+    sec = ax.secondary_xaxis(location=0)
+    sec.set_xticks([0, 2, 4, 6.5], labels=["\n\n"+xl for xl in secondary_xlabel], fontsize=6)
+    # sec.tick_params(bottom = False) 
+    # sec.set_xticklabels([])
+    sec.set(xlabel=None)
+    sec.tick_params(bottom=False)  # remove the ticks
+
+
+    sec2 = ax.secondary_xaxis(location=0)
+    sec2.set_xticks([-0.5, 0.5, 3.5, 4.5, 8.5], labels=[])
+    sec2.tick_params('x', length=25, width=0.8)
+    ax.set_xlim(-0.5, 8.5)
+
 
     folder_name_split = args.json_file.split("/")
     title_name = folder_name_split[-1] + " " + exp_name + " Exp\nOperator Breakdown w/ GPU Idle(Inference)\n" + ("Warmup with 5 examples, profile result for 6th inference sample" if "t2i" in args.json_file else "Warmup with 10 examples, profile result for 11th inference sample")
     wrapup_graph(plt, ax, "\n\n"+exp_name, xlabel, 'Execution Time Breakdown (ms)', title_name, save_folder_path, "_decoding_step_operator_breakdown_overall.pdf", dpi, nested=nested, file_name_passed=file_name_passed)
 
 
-def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, xlabel, exp_name, save_folder_path, nested=False, file_name_passed=False):
+def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, key_order, xlabel, secondary_xlabel, exp_name, save_folder_path, nested=False, file_name_passed=False):
     fig, ax, dpi = prep_graph()
 
     steps_len = len(xlabel)
     bottom = [0]*steps_len
     bottom_compare = [0]*steps_len
+    bottom_real = [0]*steps_len
+    bottom_compare_real = [0]*steps_len
     x = np.arange(steps_len)
 
     shift=0.2
@@ -847,26 +855,37 @@ def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, xl
         total_time.append(sum([v[i] for v in kernel_breakdown.values()]))
         total_time_compare.append(sum([v[i] for v in compare_breakdown.values()]))
 
-    for idx, (k, v) in enumerate(kernel_breakdown.items()):
+
+    # for idx, (k, v) in enumerate(kernel_breakdown.items()):
+    for idx, k in enumerate(key_order):
         label1=[float(xx) for xx in x.copy()]
         label2=[float(xx) for xx in x.copy()]
 
         value1 = list()
         value2 = list()
+        value1_real = list()
+        value2_real = list()
         for idxidx, vv in enumerate(kernel_breakdown[k]):
             if idxidx<num_separated_bar:
                 value1.append(vv/total_time[idxidx]*100)
                 value2.append(compare_breakdown[k][idxidx]/total_time_compare[idxidx]*100)
+                value1_real.append(vv)
+                value2_real.append(compare_breakdown[k][idxidx])
                 label1[idxidx] -= shift
                 label2[idxidx] += shift
             else:
                 value1.append(0)
                 value2.append(vv/total_time[idxidx]*100 if total_time[idxidx]>0 else 0)
+                value1_real.append(0)
+                value2_real.append(vv)
 
         ax.bar(label1, value1,  bottom=bottom, label=k, color=cmap[k], width=0.35)
         ax.bar(label2, value2, bottom=bottom_compare, color=cmap[k], width=0.35)
         bottom = np.add(bottom, value1)
         bottom_compare = np.add(bottom_compare, value2)
+        bottom_real = np.add(bottom_real, value1_real)
+        bottom_compare_real = np.add(bottom_compare_real, value2_real)
+
 
         # ax.bar([xx-shift for xx in x], v if len(kernel_breakdown) != 0 else [0]*len(x), bottom=bottom, label=k, color=cmap[k], width=0.35)
         # ax.bar([xx+shift for xx in x], compare_breakdown[k] if len(compare_breakdown) != 0 else [0]*len(x), bottom=bottom_compare, color=cmap[k], width=0.35)
@@ -874,17 +893,65 @@ def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, xl
         # bottom = np.add(bottom, v)
         # bottom_compare = np.add(bottom_compare, compare_breakdown[k])
 
-    # plt.ylim(0,50000)
-    ax.legend(fontsize=4, ncol=5, bbox_to_anchor=(0.5, 1.43), loc="upper center")
+    times = list()
+    baseline = bottom_real[0]
+    for idx, (a, b) in enumerate(zip(bottom_real, bottom_compare_real)):
+        if idx < num_separated_bar:
+            times.append(a/baseline)
+            times.append(b/baseline)
+        else:
+            times.append(b/baseline)
+
+    plt.ylim(0,108)
+
+    ax.legend(fontsize=4, ncol=8, bbox_to_anchor=(0.45, 1.1), loc="upper center")
     xxlabel = [val for pair in zip([xx-shift for xx in x[:num_separated_bar]], [xx+shift for xx in x[:num_separated_bar]]) for val in pair]+list(x[num_separated_bar:])
     plt.xticks(xxlabel, ["P", "D"]*num_separated_bar + [""]*(len(x)-num_separated_bar), fontsize=6)
+    # ax.set_xticks(ax.get_xticks()[:8])
 
     sec = ax.secondary_xaxis(location=0)
-    # if len(xlabel) == 20:
-    #     sec.set_xticks(x, labels=[xl+"        " for xl in xlabel], fontsize=6, rotation=90)
-    # else:
     sec.set_xticks(x, labels=["\n"+xl for xl in xlabel], fontsize=6)
-    sec.tick_params(bottom = False) 
+
+    print(times)
+    # Set an offset that is used to bump the label up a bit above the bar.
+    y_offset = 102
+    # Add labels to each bar.
+    for i, t in enumerate(times):
+        if i < num_separated_bar*2:
+            if i==0:
+                ax.text(i//2-shift, y_offset, f'{baseline:.1f}ms', ha='center', weight='bold', fontsize=3)
+            elif i%2==1:
+                ax.text(i//2+shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=3)    
+            else:
+                ax.text(i//2-shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=3)
+
+        else:
+            ax.text(i-num_separated_bar, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=3)    
+
+
+    sec = ax.secondary_xaxis(location=0)
+    sec.set_xticks([0, 2, 4, 6.5], labels=["\n\n"+xl for xl in secondary_xlabel], fontsize=6)
+    # sec.tick_params(bottom = False) 
+    # sec.set_xticklabels([])
+    sec.set(xlabel=None)
+    sec.tick_params(bottom=False)  # remove the ticks
+
+
+    sec2 = ax.secondary_xaxis(location=0)
+    sec2.set_xticks([-0.5, 0.5, 3.5, 4.5, 8.5], labels=[])
+    sec2.tick_params('x', length=25, width=0.8)
+    ax.set_xlim(-0.5, 8.5)
+
+    major_ticks = np.arange(0, 101, 20)
+
+    ax.set_yticks(major_ticks)
+
+    # And a corresponding grid
+    ax.grid(which='both')
+
+    # Or if you want different settings for the grids:
+    ax.grid(which='minor', alpha=0.2)
+
 
     folder_name_split = args.json_file.split("/")
     title_name = folder_name_split[-1] + " " + exp_name + " Exp\nOperator Breakdown w/ GPU Idle(Inference)\n" + ("Warmup with 5 examples, profile result for 6th inference sample" if "t2i" in args.json_file else "Warmup with 10 examples, profile result for 11th inference sample")
@@ -978,6 +1045,17 @@ def graph_overall_grouped(kernel_breakdown, xlabel, exp_name, save_folder_path, 
 
     sec = ax.secondary_xaxis(location=0)
     sec.set_xticks(x, labels=["\n\n"+sx for sx in secondary_xlabel], fontsize=FONTSIZE)#, rotation=90)
+
+    # label the classes:
+    sec = ax.secondary_xaxis(location=0)
+    sec.set_xticks([1, 3, 6.5], labels=['\n\nMammals', '\n\nReptiles', '\n\nBirds'])
+    sec.tick_params('x', length=0)
+
+    # # lines between the classes:
+    # sec2 = ax.secondary_xaxis(location=0)
+    # sec2.set_xticks([-0.5, 2.5, 4.5, 8.5], labels=[])
+    # sec2.tick_params('x', length=40, width=1.5)
+    # ax.set_xlim(-0.6, 8.6)
 
     # Rotating X-axis labels
     ax.tick_params(axis='x')#, rotation=90)
@@ -1501,28 +1579,47 @@ elif args.figure1:
     graph_overall_ratio(overall_breakdown, model_name, "Workloads", "/fsx-atom/yejinlee/analysis_figures/breakdown/overall_breakdown_wo_idle_normalized.pdf", file_name_passed=True)
 
 elif args.figure1_separate:
-    model_name = [
-        "IT-T\nCM3",
-        "I-T\nCM3",
-        "T-I\nCM3",
-        "T-T\nCodeLlama",
-        "HSTU",
-        "S2TT\nSeamless",
-        "S2ST\nSeamless",
-        "T2TT\nSeamless",
-        "T2ST\nSeamless"
+    # model_name = [
+    #     "IT-T\nCM3",
+    #     "I-T\nCM3",
+    #     "T-I\nCM3",
+    #     "T-T\nCodeLlama",
+    #     "HSTU",
+    #     "S2TT\nSeamless",
+    #     "S2ST\nSeamless",
+    #     "T2TT\nSeamless",
+    #     "T2ST\nSeamless"
+    # ]
+    work_load = [
+        "T-T",
+        "IT-T",
+        "I-T",
+        "T-I",
+        "",
+        "S2TT",
+        "S2ST",
+        "T2TT",
+        "T2ST",
     ]
+
+    model_name = [
+        "Llama",
+        "Chameleon",
+        "HSTU",
+        "Seamless"
+    ]
+
     file_paths=[
+        # # Codellama
+        # "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_4/",
+        # Codellama
+        "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_16/",
         # Chameleon (ImgTxt2Txt)
         "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
         # # Chameleon (Img2Txt)
         "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
         # Chameleon (Txt2Img)
         "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.16.en.image_gen.g.True/%j/",
-        # # Codellama
-        # "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/MBPP/batch_size_4/",
-        # Codellama
-        "/fsx-atom/yejinlee/paper_submission_results/bigcode_eval_34B_breakdown/1gpu_1node/HumanEval/batch_size_16/",
         # HSTU
         "/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_32/",
         # Seamless (S2TT)
@@ -1535,14 +1632,14 @@ elif args.figure1_separate:
         "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_384/",
     ]
     desired_prefixes_list=[
+        # Codellama
+        "MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG*MODULE_SCORING_AG",
         # Chameleon (ImgTxt2Txt)
         "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
         # Chameleon (Img2Txt)
         "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
         # Chameleon (Txt2Img)
         "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG",
-        # Codellama
-        "MODULE_Embedding_AG*MODULE_LlamaRMSNorm_AG*MODULE_Linear_AG*MODULE_LlamaRotaryEmbedding_AG*MODULE_SiLU_AG*MODULE_TEXT_DECODE_AG*MODULE_Attention_AG*MODULE_SCORING_AG",
         # HSTU
         "MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG",
         # # Seamless (S2TT)
@@ -1663,8 +1760,10 @@ elif args.figure1_separate:
 
 
     if "1gpu_1node" in file_paths[0]:
-        del prefill_overall_breakdown["Communication"]
-        del decode_overall_breakdown["Communication"]
+        if "Communication" in prefill_breakdown:
+            del prefill_overall_breakdown["Communication"]
+        if "Communication" in decode_overall_breakdown:
+            del decode_overall_breakdown["Communication"]
 
     del_keys = list()
     for k, v in prefill_overall_breakdown.items():
@@ -1675,13 +1774,19 @@ elif args.figure1_separate:
     for k in del_keys:
         del prefill_overall_breakdown[k]
         del decode_overall_breakdown[k]
+
+
     print(prefill_overall_breakdown)
     print(decode_overall_breakdown)
 
     assert prefill_overall_breakdown.keys() == decode_overall_breakdown.keys()
 
-    graph_overall_compare_separate(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "./onellm_scripts/analysis_figures/breakdown/separate_overall_breakdown.pdf", file_name_passed=True)
-    graph_overall_compare_separate_ratio(prefill_overall_breakdown, decode_overall_breakdown, model_name, "Workloads", "./onellm_scripts/analysis_figures/breakdown/separate_overall_breakdown_ratio.pdf", file_name_passed=True)
+    key_order = ["Attention", "Linear",  "LayerNorm", "Conv1d", "Embedding", "KV_Cache_Reorder", "Misc", "Idle"]
+    print(set(prefill_overall_breakdown.keys()))
+    print(set(key_order))
+    assert set(prefill_overall_breakdown.keys()) == set(key_order)
+    graph_overall_compare_separate(prefill_overall_breakdown, decode_overall_breakdown, key_order, work_load, model_name, "Workloads", "./onellm_scripts/analysis_figures/breakdown/separate_overall_breakdown.pdf", file_name_passed=True)
+    graph_overall_compare_separate_ratio(prefill_overall_breakdown, decode_overall_breakdown, key_order, work_load, model_name, "Workloads", "./onellm_scripts/analysis_figures/breakdown/separate_overall_breakdown_ratio.pdf", file_name_passed=True)
 
 else:
     folder_name_split = args.json_file.split("/")

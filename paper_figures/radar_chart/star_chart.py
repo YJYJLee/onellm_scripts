@@ -8,7 +8,7 @@ from math import nan, isnan, ceil
 import math
 
 # DIR_PREFIX=""
-DIR_PREFIX="./onellm_scripts/data_for_paper/radar_chart/"
+DIR_PREFIX="/Users/yejinlee/hpca_2025/onellm_scripts/data_for_paper/radar_chart/"
 
 class Radar(object):
     def __init__(self, figure, title, labels=None, rect=None):
@@ -18,8 +18,8 @@ class Radar(object):
 
         self.n = len(title)
         # self.angles = np.arange(0, 360, 360.0/self.n)
-        # self.angles = [18, 90, 162, 234, 306]
-        self.angles = [0, 90, 180, 270]
+        self.angles = [18, 90, 162, 234, 306]
+        # self.angles = [0, 90, 180, 270]
 
         self.axes = [figure.add_axes(rect, projection='polar', label='axes%d' % i) for i in range(self.n)]
 
@@ -30,7 +30,7 @@ class Radar(object):
             ax.patch.set_visible(False)
             ax.grid(False)
             ax.xaxis.set_visible(False)
-
+            ax.set_yticklabels([])
         # for ax, angle, label in zip(self.axes, self.angles, labels):
         #     ax.set_rgrids(range(1, 6), angle=angle, labels=label, fontsize=12)
         #     ax.spines['polar'].set_visible(False)
@@ -39,19 +39,22 @@ class Radar(object):
         for ax, angle in zip(self.axes, self.angles):
             # ax.set_rgrids(range(1, 6), angle=angle, fontsize=12)
             ax.spines['polar'].set_visible(False)
-            ax.set_ylim(0, 6)
+            ax.set_ylim(0, 5)
+            
 
     def plot(self, values, *args, **kw):
         angle = np.deg2rad(np.r_[self.angles, self.angles[0]])
         values = np.r_[values, values[0]]
         self.ax.plot(angle, values, *args, **kw)
         self.ax.fill(angle, values, alpha=0.1, color=kw['color'])
+        # self.ax.set_yticklabels([])
 
 
 
 if __name__ == '__main__':
     # tit = ['Communication\n(GB)\n\n', 'Computation\n(TFLOPs)', 'Memory Capacity\n(GB)', 'Latency\n(ms)', 'GPU Util\n(%)']
-    tit = ['Computation\n(TFLOPs)', 'Memory Capacity\n(GB)', 'Latency\n(ms)', 'GPU Util\n(%)']
+    # tit = ['Model Size', 'Computation\n(TFLOPs)', 'Memory Capacity\n(GB)', 'Latency\n(ms)', 'GPU Util\n(%)']
+    tit = ['Model Size', 'Computation', 'Memory Capacity', 'Latency', 'GPU Util']
     
     n_gpu = 1
     num_shot = [0]
@@ -76,7 +79,8 @@ if __name__ == '__main__':
     # ]
 
     batch_size = list()
-    for bs in [1,4,8,16,32,64,128,256,384,512]:
+    # for bs in [1,4,8,16,32,64,128,256,384,512]:
+    for bs in [1]:
         batch_size.append({
             'MSCOCO': bs,
             'Flickr30k': bs,
@@ -139,6 +143,7 @@ if __name__ == '__main__':
                     return np.average(input_seq_len), np.average(output_seq_len), np.average(decoding_step)
             else:
                 print("File doesn't exist: " + file_path)
+                return -1, -1, -1
 
            
 
@@ -154,28 +159,6 @@ if __name__ == '__main__':
                 print("File doesn't exist: " + file_path)
 
             return np.average(mem)
-
-        # def get_latency(file_path):
-        #     file_path += "/timer_result.txt"
-        #     timer_result = dict()
-        #     if os.path.isfile(file_path):
-        #         f = open(file_path, "r")
-        #         print("Reading from ", file_path)
-        #         headers = None
-        #         for idx, sl in enumerate(f):
-        #             if idx==0:
-        #                 headers = re.sub("\n", "", sl).split("\t")
-        #                 for h in headers:
-        #                     timer_result[h] = list()
-        #             else:
-        #                 slsl = [float(s) for s in re.sub("\n", "", sl).split("\t") if s!=""]
-        #                 for idx, h in enumerate(headers):
-        #                     # timer_result[h].append(slsl[idx] if not log else np.log(slsl[idx]))
-        #                     timer_result[h].append(slsl[idx])
-        #     else:
-        #         print("File doesn't exist: " + file_path)
-        #     return timer_result
-
 
         def get_latency(file_path):
             file_path += "/timer_result.txt"
@@ -206,44 +189,46 @@ if __name__ == '__main__':
 
         def collect_data(dataset, bs, model=None, n_layer=-1):
             working_dir = get_folder(dataset, bs)
-            get_seq_len(working_dir, model=model)
-            get_memory_capacity(working_dir)
-            get_latency(get_timing_folder(dataset, bs))
-            get_gpu_util(working_dir)
-            return
-
-            working_dir = get_folder(dataset, bs)
             input_seq_len, output_seq_len, decoding_steps = get_seq_len(working_dir, model=model)
             print(dataset)
             print("input_seq: ", input_seq_len)
             print("output_seq_len: ", output_seq_len)
             print("decoding_steps: ", decoding_steps)
 
-            if model == "seamless":
-                def get_dict_sum(_dict):
-                    _sum = 0
-                    for k, v in _dict.items():
-                        if type(v)==dict:
-                            _sum += get_dict_sum(v)
-                        else:
-                            print(k, " ", v)
-                            _sum += v
-                    return _sum
+            def get_dict_sum(_dict):
+                _sum = 0
+                for k, v in _dict.items():
+                    if type(v)==dict:
+                        _sum += get_dict_sum(v)
+                    else:
+                        print(k, " ", v)
+                        _sum += v
+                return _sum
 
-                
+
+            if model == "seamless":                
                 result = [
-                        # 0, \
+                        2.3, \
                         (get_dict_sum(get_computation("prefill", bs, input_seq_len, model=model, n_layer={"Encoder": 24, "Decoder": 24, "NAR": 6}, task=dataset))+get_dict_sum(get_computation("decode", bs, {'Encoder': 1, 'Decoder': 1, 'Decode': 1, 'NART_Encoder': 1, 'NART_Decoder': 1, 'Vocoder': 1}, model=model, n_layer={"Encoder": 24, "Decoder": 24, "NAR": 6}, task=dataset, decoding_step=decoding_steps["Decoder"])))/1024/1024/1024/1024, \
                         get_memory_capacity(working_dir)/1024/1024/1024, \
-                        sum([np.average(v) for v in get_latency(working_dir).values()]), \
+                        sum([np.average(v) for v in get_latency(get_timing_folder(dataset, bs)).values()]), \
                         get_gpu_util(working_dir)]
-                
+            elif model == "hstu":
+                result = [
+                        # 0, \
+                        4,
+                        get_dict_sum(get_computation(None, bs, input_seq_len, model=model, n_layer={"l1": 3, "l2": 21}, task=dataset))/1024/1024/1024/1024, \
+                        get_memory_capacity(working_dir)/1024/1024/1024, \
+                        sum([np.average(v) for v in get_latency(get_timing_folder(dataset, bs)).values()]), \
+                        get_gpu_util(working_dir)]
+
             else:
                 result = [
+                        34,
                         # (sum(get_communication("prefill", bs, input_seq_len).values())+sum(get_communication("decode", bs).values())*decoding_steps)/1024/1024/1024, \
                         (sum(get_computation("prefill", bs=bs, seq_len=input_seq_len, n_layer=n_layer).values())+sum(get_computation("decode", bs=bs, n_layer=n_layer).values())*decoding_steps)/1024/1024/1024/1024, \
                         get_memory_capacity(working_dir)/1024/1024/1024, \
-                        sum([np.average(v) for v in get_latency(working_dir).values()]), \
+                        sum([np.average(v) for v in get_latency(get_timing_folder(dataset, bs)).values()]), \
                         get_gpu_util(working_dir)]
 
                 result = [0 if isnan(r) else r for r in result]
@@ -288,43 +273,6 @@ if __name__ == '__main__':
                 assert False
 
         def get_timing_folder(dataset, bs):
-            # if dataset == "MSCOCO":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
-            # elif dataset == "Flickr30k":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.flickr30k."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
-            # elif dataset == "TextVQA":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.textvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
-            # elif dataset == "OKVQA":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.okvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
-            # elif dataset == "Vizwiz":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.vizwiz."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
-            # elif dataset == "Hellaswag":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.hellaswag."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
-            # elif dataset == "Arc_easy":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.arc_easy."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
-            # elif dataset == "HumanEval":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/HumanEval_codellama/batch_size_"+str(bs)
-            # elif dataset == "MBPP":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/MBPP_codellama/batch_size_"+str(bs)
-            # elif dataset == "Coco_Image":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
-            # elif dataset == "Partiprompts":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
-            # elif dataset == "S2ST":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/S2ST/batch_size_"+str(bs)+"/"
-            # elif dataset == "S2TT":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/S2TT/batch_size_"+str(bs)+"/"
-            # elif dataset == "T2ST":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/T2ST/batch_size_"+str(bs)+"/"
-            # elif dataset == "T2TT":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/radar_chart/"+str(n_gpu)+"gpu_1node/T2TT/batch_size_"+str(bs)+"/"
-            # elif dataset == "HSTU-Pytorch":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/sweep/pytorch/batch_size_"+str(bs)+"/"
-            # elif dataset == "HSTU-Triton":
-            #     return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/sweep/batch_size_"+str(bs)+"/"
-            # else:
-            #     assert False
-
             if dataset == "MSCOCO":
                 return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/latency_distribution_w_warmup/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
             elif dataset == "Flickr30k":
@@ -568,9 +516,14 @@ if __name__ == '__main__':
                     flops["vocoder"]["dur_predictor"]["linear"] = bs*S
                 return flops
             elif model == "hstu":
-                flops = dict()
-                flops["base"]
-                flops["l2"]
+                embedding_dim=512
+                l1_layer=3
+                l2_layer=11
+                flops = {
+                    "base": n_layer["l1"]*(24*bs*seq_len['l1']*embedding_dim*embedding_dim+4*bs*seq_len['l1']*seq_len['l1']*embedding_dim),
+                    "l2": n_layer["l2"]*(24*bs*seq_len['l2']*embedding_dim*embedding_dim+4*bs*seq_len['l2']*seq_len['l2']*embedding_dim),
+                }
+                return flops
             else:
                 if phase=="prefill":
                     return {
@@ -626,20 +579,20 @@ if __name__ == '__main__':
 
         data = [
             ('[I2T] MSCOCO', collect_data('MSCOCO', batch_dict['MSCOCO'], n_layer=48)),
-            ('[I2T] Flickr30k', collect_data('Flickr30k', batch_dict['Flickr30k'], n_layer=48)),
-            ('[IT2T] TextVQA', collect_data('TextVQA', batch_dict['TextVQA'], n_layer=48)),
-            ('[IT2T] OKVQA', collect_data('OKVQA', batch_dict['OKVQA'], n_layer=48)),
+            # ('[I2T] Flickr30k', collect_data('Flickr30k', batch_dict['Flickr30k'], n_layer=48)),
+            # ('[IT2T] TextVQA', collect_data('TextVQA', batch_dict['TextVQA'], n_layer=48)),
+            # ('[IT2T] OKVQA', collect_data('OKVQA', batch_dict['OKVQA'], n_layer=48)),
             ('[IT2T] Vizwiz', collect_data('Vizwiz', batch_dict['Vizwiz'], n_layer=48)),
             ('[T2I] Coco_Image', collect_data('Coco_Image', batch_dict['Coco_Image'], n_layer=48)),
-            ('[T2I] Partiprompts', collect_data('Partiprompts', batch_dict['Partiprompts'], n_layer=48)),
+            # ('[T2I] Partiprompts', collect_data('Partiprompts', batch_dict['Partiprompts'], n_layer=48)),
             ('[S2ST] Fleurs', collect_data('S2ST', batch_dict['S2ST'], model="seamless")),
-            ('[S2TT] Fleurs', collect_data('S2TT', batch_dict['S2TT'], model="seamless")),
-            ('[T2TT] Fleurs', collect_data('T2TT', batch_dict['T2TT'], model="seamless")),
-            ('[T2ST] Fleurs', collect_data('T2ST', batch_dict['T2ST'], model="seamless")),
+            # ('[S2TT] Fleurs', collect_data('S2TT', batch_dict['S2TT'], model="seamless")),
+            # ('[T2TT] Fleurs', collect_data('T2TT', batch_dict['T2TT'], model="seamless")),
+            # ('[T2ST] Fleurs', collect_data('T2ST', batch_dict['T2ST'], model="seamless")),
             ('[T2T] HumanEval', collect_data('HumanEval', batch_dict['HumanEval'], model="codellama", n_layer=48)),
-            ('[T2T] MBPP', collect_data('MBPP', batch_dict['MBPP'], model="codellama", n_layer=48)),
+            # ('[T2T] MBPP', collect_data('MBPP', batch_dict['MBPP'], model="codellama", n_layer=48)),
             ('[F2F] HSTU-Pytorch', collect_data('HSTU-Pytorch', batch_dict['HSTU'], model="hstu", n_layer=48)),
-            ('[F2F] HSTU-Triton', collect_data('HSTU-Triton', batch_dict['HSTU'], model="hstu", n_layer=48)),
+            # ('[F2F] HSTU-Triton', collect_data('HSTU-Triton', batch_dict['HSTU'], model="hstu", n_layer=48)),
         ]
 
         return data
@@ -657,9 +610,13 @@ if __name__ == '__main__':
         # '[T2T] Hellaswag': cmap[8],
         # '[T2T] Arc_easy': cmap[9],
         '[S2ST] Fleurs': cmap[12],
+        '[S2TT] Fleurs': cmap[12],
+        '[T2ST] Fleurs': cmap[12],
+        '[T2TT] Fleurs': cmap[12],
         '[T2T] HumanEval': cmap[14],
         '[T2T] MBPP': cmap[14],
-        '[F2F] HSTU': cmap[3]
+        '[F2F] HSTU-Triton': cmap[3],
+        '[F2F] HSTU-Pytorch': cmap[3]
     }
     
     gathered_data = dict()
@@ -694,10 +651,14 @@ if __name__ == '__main__':
                 min_data[idx] = min(min_data[idx], min(d))
             print("MAX: ", max_data)
 
+            # for d in data:
+            #     d[1] = [np.log(vv) for vv in d[1]]
+
 
             lab = list()
             shift = -1
             for idx, md in enumerate(max_data):
+                
                 if idx==2:
                     if min_data[idx] < 0:
                         shift = min_data[idx]*-1
@@ -715,17 +676,21 @@ if __name__ == '__main__':
             radar = Radar(fig, tit)#, lab)
             
             for d in data:
-                # radar.plot([dd/(max_d/5) if dd>0 else (dd+shift)/(max_d/5) for idx, (dd, max_d) in enumerate(zip(d[1], max_data))], '-', lw=2, marker='o', color=colormap[d[0]], alpha=1, label=d[0])
-                radar.plot(d[1], '-', lw=2, marker='o', color=colormap[d[0]], alpha=1, label=d[0])
+                radar.plot([dd/(max_d/5) if dd>0 else (dd+shift)/(max_d/5) for idx, (dd, max_d) in enumerate(zip(d[1], max_data))], '-', lw=2, marker='o', color=colormap[d[0]], alpha=1, label=d[0])
+                # radar.plot(d[1], '-', lw=2, marker='o', color=colormap[d[0]], alpha=1, label=d[0])
 
 
             radar.ax.legend(loc='upper right', bbox_to_anchor=(1.05, 1.05))
+            # radar.ax.set_yticklabels([])
+            radar.ax.get_yaxis().set_ticklabels([])
             # radar.ax.set_title("# Shot "+str(ns) + " / # GPU " + str(n_gpu) + " / Batch size "+str(bs), fontsize=18)
             fig.show()
             # fig.savefig('/fsx-atom/yejinlee/analysis_figures/star_chart/num_shot'+str(ns)+'_bs1.pdf')
             # print("Saving to "+ '/fsx-atom/yejinlee/analysis_figures/star_chart/num_shot'+str(ns)+'_bs1.pdf')
-            fig.savefig('/fsx-atom/yejinlee/analysis_figures/star_chart/num_shot'+str(ns)+re.sub(re.compile(r'\s+'), '', str(bs))+'.pdf')
-            print("Saving to "+ '/fsx-atom/yejinlee/analysis_figures/star_chart/num_shot'+str(ns)+re.sub(re.compile(r'\s+'), '', str(bs))+'.pdf')
+            dump_dir = '/Users/yejinlee/hpca_2025/onellm_scripts/analysis_figures/star_chart'
+            os.makedirs(dump_dir, exist_ok=True)
+            fig.savefig(dump_dir+'/num_shot'+str(ns)+re.sub(re.compile(r'\s+'), '', str(bs))+'.pdf')
+            print("Saving to "+ dump_dir+'/num_shot'+str(ns)+re.sub(re.compile(r'\s+'), '', str(bs))+'.pdf')
 
 
 # %%
