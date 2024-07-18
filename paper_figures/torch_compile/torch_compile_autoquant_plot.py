@@ -4,11 +4,14 @@ import re
 import numpy as np
 import matplotlib.pyplot as plt 
 import numpy as np 
+from matplotlib import colormaps
+from statistics import geometric_mean
 
 n_gpu=1
 ns=0
 
-DIR_PREFIX="./onellm_scripts/data_for_paper/compile_graph/"
+# DIR_PREFIX="./onellm_scripts/data_for_paper/compile_graph/"
+DIR_PREFIX="/Users/yejinlee/hpca_2025/onellm_scripts/data_for_paper/compile_graph/"
 
 
 def reject_outliers(data, m=2.):
@@ -128,12 +131,12 @@ def plot(batch_size_dict):
     for k, bs in batch_size_dict.items():
         torch_compile.append(sum([np.average(v) for v in get_latency(get_folder(k, bs, "torch_compile")).values()]))
 
-    torch_compile = [a/b if b>0 else (2 if a>0 else 0) for a, b in zip(torch_compile, baseline)]
+    torch_compile = [b/a if a>0 else (2 if a>0 else 0) for a, b in zip(torch_compile, baseline)]
 
     torch_compile_autoquant = []
     for k, bs in batch_size_dict.items():
         torch_compile_autoquant.append(sum([np.average(v) for v in get_latency(get_folder(k, bs, "torch_compile_autoquant")).values()]))
-    torch_compile_autoquant = [a/b if b>0 else (2 if a>0 else 0) for a, b in zip(torch_compile_autoquant, baseline)]
+    torch_compile_autoquant = [b/a if a>0 else (2 if a>0 else 0) for a, b in zip(torch_compile_autoquant, baseline)]
 
     baseline = [b/b if b>0 else 0 for b in baseline]
 
@@ -149,56 +152,96 @@ def plot(batch_size_dict):
     # plt.bar(x+0.1, torch_compile, width, color='orange') 
     # plt.bar(x+0.3, torch_compile_autoquant, width, color='green') 
 
-    plt.bar(x-0.2, baseline, width, color='cyan') 
-    plt.bar(x, torch_compile, width, color='orange') 
-    plt.bar(x+0.2, torch_compile_autoquant, width, color='green') 
+    # plt.bar(x-0.2, baseline, width, color='cyan') 
+    plt.bar(x-0.1, torch_compile, width, color=colormaps['Set3'].colors[6]) 
+    plt.bar(x+0.1, torch_compile_autoquant, width, color=colormaps['Set3'].colors[4]) 
+
+
+    print("34B torch.compile speedup: ", geometric_mean([t for idx, t in enumerate(torch_compile) if idx%2==0 and t!=0]))
+    print("7B torch.compile speedup: ", geometric_mean([t for idx, t in enumerate(torch_compile) if idx%2==1 and t!=0]))
 
     plt.xticks(x, list(batch_size_dict.keys()), rotation=90) 
     plt.xlabel("Workloads") 
     plt.ylabel("Normalized Speedup") 
-    plt.title("Batch Size" + str(batch_size_dict["MSCOCO-34B"]))
+    plt.title("Batch Size " +(str(batch_size_dict["MSCOCO-34B"]) if len(set(batch_size_dict.values()))==1 else "max"))
     # plt.legend(["Baseline", "Torch.compile Baseline", "Torch.compile", "Torch.compile+Autoquant"],ncol=4)
-    plt.legend(["Baseline", "Torch.compile", "Torch.compile+Autoquant"], ncol=3, bbox_to_anchor=(0.5, 1.15), loc="upper center")
+    # plt.legend(["Baseline", "Torch.compile", "Torch.compile+Autoquant"], ncol=3, bbox_to_anchor=(0.5, 1.15), loc="upper center")
+    plt.legend(["Torch.compile", "Torch.compile+Autoquant"], ncol=2, bbox_to_anchor=(0.5, 1.15), loc="upper center")
     
     plt.grid(lw=0.2)
 
     dump_dir = './onellm_scripts/analysis_figures/torch_compile/'
     os.makedirs(dump_dir, exist_ok=True)
 
-    plt.savefig(dump_dir+"batch_size_"+str(batch_size_dict["MSCOCO-34B"])+".pdf", bbox_inches = 'tight')
-    print("Saving to ", dump_dir+"batch_size_"+str(batch_size_dict["MSCOCO-34B"])+".pdf")
+    plt.savefig(dump_dir+"batch_size_"+(str(batch_size_dict["MSCOCO-34B"]) if len(set(batch_size_dict.values()))==1 else "max")+".pdf", bbox_inches = 'tight')
+    print("Saving to ", dump_dir+"batch_size_"+(str(batch_size_dict["MSCOCO-34B"]) if len(set(batch_size_dict.values()))==1 else "max")+".pdf")
     plt.show() 
 
+
+# batch_size_dict = {
+#     "MSCOCO-34B": 1,
+#     "MSCOCO-7B": 1,
+#     "Flickr30k-34B": 1,
+#     "Flickr30k-7B": 1,
+#     "TextVQA-34B": 1,
+#     "TextVQA-7B": 1,
+#     "OKVQA-34B": 1,
+#     "OKVQA-7B": 1,
+#     "Vizwiz-34B": 1,
+#     "Vizwiz-7B": 1,
+#     "Coco_Image-34B": 1,
+#     "Coco_Image-7B": 1,
+#     "Partiprompts-34B": 1,
+#     "Partiprompts-7B": 1,
+#     "HumanEval-34B": 1,
+#     "HumanEval-7B": 1,
+#     "MBPP-34B": 1,
+#     "MBPP-7B": 1,
+#     "S2ST": 1,
+#     "S2TT": 1,
+#     "T2ST": 1,
+#     "T2TT": 1,
+# }
+# batch_sizes = [1,4,8,16,32,64,128]
+# # batch_sizes = [1]
+# for bs in batch_sizes:
+#     for k, v in batch_size_dict.items():
+#         batch_size_dict[k] = bs
+
+#     plot(batch_size_dict)
+
+
+batch_size_dict = {
+    "MSCOCO-34B": 16,
+    "MSCOCO-7B": 16,
+    "Vizwiz-34B": 1,
+    "Vizwiz-7B": 1,
+    "Coco_Image-34B": 8,
+    "Coco_Image-7B": 16,
+    "HumanEval-34B": 1,
+    "HumanEval-7B": 4,
+    # "S2ST": 64,
+    # "S2TT": 64,
+    # "T2ST": 64,
+    # "T2TT": 64,
+}
+plot(batch_size_dict)
 
 batch_size_dict = {
     "MSCOCO-34B": 1,
     "MSCOCO-7B": 1,
-    "Flickr30k-34B": 1,
-    "Flickr30k-7B": 1,
-    "TextVQA-34B": 1,
-    "TextVQA-7B": 1,
-    "OKVQA-34B": 1,
-    "OKVQA-7B": 1,
     "Vizwiz-34B": 1,
     "Vizwiz-7B": 1,
     "Coco_Image-34B": 1,
     "Coco_Image-7B": 1,
-    "Partiprompts-34B": 1,
-    "Partiprompts-7B": 1,
     "HumanEval-34B": 1,
     "HumanEval-7B": 1,
-    "MBPP-34B": 1,
-    "MBPP-7B": 1,
-    "S2ST": 1,
-    "S2TT": 1,
-    "T2ST": 1,
-    "T2TT": 1,
+    # "S2ST": 1,
+    # "S2TT": 1,
+    # "T2ST": 1,
+    # "T2TT": 1,
 }
-batch_sizes = [1,4,8,16,32,64,128]
-# batch_sizes = [1]
-for bs in batch_sizes:
-    for k, v in batch_size_dict.items():
-        batch_size_dict[k] = bs
 
-    plot(batch_size_dict)
+plot(batch_size_dict)
+
 # %%

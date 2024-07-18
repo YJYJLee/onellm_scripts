@@ -18,13 +18,13 @@ class Radar(object):
 
         self.n = len(title)
         # self.angles = np.arange(0, 360, 360.0/self.n)
-        self.angles = [18, 90, 162, 234, 306]
-        # self.angles = [0, 90, 180, 270]
+        # self.angles = [18, 90, 162, 234, 306]
+        self.angles = [0, 90, 180, 270]
 
         self.axes = [figure.add_axes(rect, projection='polar', label='axes%d' % i) for i in range(self.n)]
 
         self.ax = self.axes[0]
-        self.ax.set_thetagrids(self.angles, labels=title, fontsize=14)#, position=(0.1, 0.5))
+        self.ax.set_thetagrids(self.angles, labels=title, fontsize=20)#, position=(0.1, 0.5))
 
         for ax in self.axes[1:]:
             ax.patch.set_visible(False)
@@ -39,7 +39,7 @@ class Radar(object):
         for ax, angle in zip(self.axes, self.angles):
             # ax.set_rgrids(range(1, 6), angle=angle, fontsize=12)
             ax.spines['polar'].set_visible(False)
-            ax.set_ylim(0, 5)
+            ax.set_ylim(0, 5.5)
             
 
     def plot(self, values, *args, **kw):
@@ -47,14 +47,15 @@ class Radar(object):
         values = np.r_[values, values[0]]
         self.ax.plot(angle, values, *args, **kw)
         self.ax.fill(angle, values, alpha=0.1, color=kw['color'])
-        # self.ax.set_yticklabels([])
+        # self.ax.fill(angle, values, alpha=0.1)
 
 
 
 if __name__ == '__main__':
     # tit = ['Communication\n(GB)\n\n', 'Computation\n(TFLOPs)', 'Memory Capacity\n(GB)', 'Latency\n(ms)', 'GPU Util\n(%)']
     # tit = ['Model Size', 'Computation\n(TFLOPs)', 'Memory Capacity\n(GB)', 'Latency\n(ms)', 'GPU Util\n(%)']
-    tit = ['Model Size', 'Computation', 'Memory Capacity', 'Latency', 'GPU Util']
+    # tit = ['Model Size', 'Computation', 'Memory Capacity', 'Latency', 'GPU Util']
+    tit = ['Computation', 'Memory Capacity', 'Latency', 'GPU Util']
     
     n_gpu = 1
     num_shot = [0]
@@ -205,18 +206,32 @@ if __name__ == '__main__':
                         _sum += v
                 return _sum
 
+            def print_get_dict_sum(_dict, str=""):
+                for k, v in _dict.items():
+                    if type(v)==dict:
+                        print(k)
+                        print_get_dict_sum(v, str+"\t")
+                    else:
+                        print(str, k, v)
 
-            if model == "seamless":                
+            if model == "seamless":
+                prefill_compute =  get_computation("prefill", bs, input_seq_len, model=model, n_layer={"Encoder": 24, "Decoder": 24, "NAR": 6}, task=dataset)
+                decode_compute = get_computation("decode", bs, seq_len = None, model=model, n_layer={"Encoder": 24, "Decoder": 24, "NAR": 6}, task=dataset, decoding_step=decoding_steps["Decoder"])
+                # print("prefill compute")
+                # print_get_dict_sum(prefill_compute, "")
+                # print("decode compute")
+                # print_get_dict_sum(decode_compute, "")
+                # exit(0)
                 result = [
-                        2.3, \
-                        (get_dict_sum(get_computation("prefill", bs, input_seq_len, model=model, n_layer={"Encoder": 24, "Decoder": 24, "NAR": 6}, task=dataset))+get_dict_sum(get_computation("decode", bs, {'Encoder': 1, 'Decoder': 1, 'Decode': 1, 'NART_Encoder': 1, 'NART_Decoder': 1, 'Vocoder': 1}, model=model, n_layer={"Encoder": 24, "Decoder": 24, "NAR": 6}, task=dataset, decoding_step=decoding_steps["Decoder"])))/1024/1024/1024/1024, \
+                        # 2.3, \
+                        (get_dict_sum(prefill_compute) + get_dict_sum(decode_compute))/1024/1024/1024/1024, \
                         get_memory_capacity(working_dir)/1024/1024/1024, \
                         sum([np.average(v) for v in get_latency(get_timing_folder(dataset, bs)).values()]), \
                         get_gpu_util(working_dir)]
             elif model == "hstu":
                 result = [
                         # 0, \
-                        4,
+                        # 4,
                         get_dict_sum(get_computation(None, bs, input_seq_len, model=model, n_layer={"l1": 3, "l2": 21}, task=dataset))/1024/1024/1024/1024, \
                         get_memory_capacity(working_dir)/1024/1024/1024, \
                         sum([np.average(v) for v in get_latency(get_timing_folder(dataset, bs)).values()]), \
@@ -224,7 +239,7 @@ if __name__ == '__main__':
 
             else:
                 result = [
-                        34,
+                        # 34,
                         # (sum(get_communication("prefill", bs, input_seq_len).values())+sum(get_communication("decode", bs).values())*decoding_steps)/1024/1024/1024, \
                         (sum(get_computation("prefill", bs=bs, seq_len=input_seq_len, n_layer=n_layer).values())+sum(get_computation("decode", bs=bs, n_layer=n_layer).values())*decoding_steps)/1024/1024/1024/1024, \
                         get_memory_capacity(working_dir)/1024/1024/1024, \
@@ -368,152 +383,159 @@ if __name__ == '__main__':
                 D=1024
                 flops = dict()
 
-                S = seq_len['Encoder']
-                num_l = n_layer["Encoder"]
-                if task=="S2ST" or task=="S2TT":
-                    flops["speech_encoder"] = dict()
-                    flops["speech_encoder"]["StandardFeedForwardNetwork1"] = dict()
-                    flops["speech_encoder"]["StandardFeedForwardNetwork1"]["input_proj"] = (2*bs*S*4*D*D)*num_l
-                    flops["speech_encoder"]["StandardFeedForwardNetwork1"]["output_proj"] = (2*bs*S*4*D*D)*num_l
-                    flops["speech_encoder"]["StandardMultiheadAttention"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
-                    flops["speech_encoder"]["ConformerConvolution"] = dict()
-                    IN=1024; OUT=2048
-                    flops["speech_encoder"]["ConformerConvolution"]["conv1"] = get_conv1d(IN, OUT, 1, 1)*num_l
-                    IN=1024; OUT=1024
-                    flops["speech_encoder"]["ConformerConvolution"]["conv2"] = get_conv1d(IN, OUT, 31, 1, groups=1024)*num_l
-                    IN=1024; OUT=1024
-                    flops["speech_encoder"]["ConformerConvolution"]["conv3"] = get_conv1d(IN, OUT, 1, 1)*num_l
-                    flops["speech_encoder"]["StandardFeedForwardNetwork2"] = dict()
-                    flops["speech_encoder"]["StandardFeedForwardNetwork2"]["input_proj"] = (2*bs*S*4*D*D)*num_l
-                    flops["speech_encoder"]["StandardFeedForwardNetwork2"]["output_proj"] = (2*bs*S*4*D*D)*num_l
+                if phase=="prefill":
+                    S = seq_len['Encoder']
+                    num_l = n_layer["Encoder"]
+                    if task=="S2ST" or task=="S2TT":
+                        flops["speech_encoder"] = dict()
+                        flops["speech_encoder"]["StandardFeedForwardNetwork1"] = dict()
+                        flops["speech_encoder"]["StandardFeedForwardNetwork1"]["input_proj"] = (2*bs*S*4*D*D)*num_l
+                        flops["speech_encoder"]["StandardFeedForwardNetwork1"]["output_proj"] = (2*bs*S*4*D*D)*num_l
+                        flops["speech_encoder"]["StandardMultiheadAttention"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
+                        flops["speech_encoder"]["ConformerConvolution"] = dict()
+                        IN=1024; OUT=2048
+                        flops["speech_encoder"]["ConformerConvolution"]["conv1"] = get_conv1d(IN, OUT, 1, 1)*num_l
+                        IN=1024; OUT=1024
+                        flops["speech_encoder"]["ConformerConvolution"]["conv2"] = get_conv1d(IN, OUT, 31, 1, groups=1024)*num_l
+                        IN=1024; OUT=1024
+                        flops["speech_encoder"]["ConformerConvolution"]["conv3"] = get_conv1d(IN, OUT, 1, 1)*num_l
+                        flops["speech_encoder"]["StandardFeedForwardNetwork2"] = dict()
+                        flops["speech_encoder"]["StandardFeedForwardNetwork2"]["input_proj"] = (2*bs*S*4*D*D)*num_l
+                        flops["speech_encoder"]["StandardFeedForwardNetwork2"]["output_proj"] = (2*bs*S*4*D*D)*num_l
 
-                    flops["linear1"] = 8*bs*S*D*D
-                    flops["linear2"] = 8*bs*S*D*D
+                        flops["linear1"] = 8*bs*S*D*D
+                        flops["linear2"] = 8*bs*S*D*D
 
-                    flops["UnitYTransformerAdaptorLayer"] = dict()
-                    IN=1024; OUT=2048
-                    flops["UnitYTransformerAdaptorLayer"]["conv1d"] = get_conv1d(IN, OUT, 8, 8, 4)
-                    IN=1024; OUT=2048
-                    flops["UnitYTransformerAdaptorLayer"]["conv1d2"] = get_conv1d(IN, OUT, 8, 8, 4)
-                    flops["UnitYTransformerAdaptorLayer"]["StandardMultiheadAttention"] = 24*bs*S*D*D + 4*bs*S*S*D
-                    flops["UnitYTransformerAdaptorLayer"]["StandardFeedForwardNetwork"] = dict()
-                    flops["UnitYTransformerAdaptorLayer"]["StandardFeedForwardNetwork"]["input_proj"] = 2*bs*S*4*D*D
-                    flops["UnitYTransformerAdaptorLayer"]["StandardFeedForwardNetwork"]["output_proj"] = 2*bs*S*4*D*D
+                        flops["UnitYTransformerAdaptorLayer"] = dict()
+                        IN=1024; OUT=2048
+                        flops["UnitYTransformerAdaptorLayer"]["conv1d"] = get_conv1d(IN, OUT, 8, 8, 4)
+                        IN=1024; OUT=2048
+                        flops["UnitYTransformerAdaptorLayer"]["conv1d2"] = get_conv1d(IN, OUT, 8, 8, 4)
+                        flops["UnitYTransformerAdaptorLayer"]["StandardMultiheadAttention"] = 24*bs*S*D*D + 4*bs*S*S*D
+                        flops["UnitYTransformerAdaptorLayer"]["StandardFeedForwardNetwork"] = dict()
+                        flops["UnitYTransformerAdaptorLayer"]["StandardFeedForwardNetwork"]["input_proj"] = 2*bs*S*4*D*D
+                        flops["UnitYTransformerAdaptorLayer"]["StandardFeedForwardNetwork"]["output_proj"] = 2*bs*S*4*D*D
 
 
-                if task=="T2TT" or task=="T2ST":
-                    flops["t2tt_encoder"] = dict()
-                    flops["t2tt_encoder"]["StandardMultiheadAttention"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
-                    flops["t2tt_encoder"]["StandardFeedForwardNetwork"] = (2*bs*S*8*D*D + 2*bs*S*8*D*D)*num_l
-
+                    if task=="T2TT" or task=="T2ST":
+                        flops["t2tt_encoder"] = dict()
+                        flops["t2tt_encoder"]["StandardMultiheadAttention"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
+                        flops["t2tt_encoder"]["StandardFeedForwardNetwork"] = (2*bs*S*8*D*D + 2*bs*S*8*D*D)*num_l
 
                 flops["t2tt_decoder"] = dict()
-                S = seq_len['Decoder']
                 num_l = n_layer["Decoder"]
-                flops["t2tt_decoder"]["StandardMultiheadAttention1"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l*decoding_step
-                flops["t2tt_decoder"]["StandardMultiheadAttention2"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l*decoding_step
-                flops["t2tt_decoder"]["StandardFeedForwardNetwork"] = (2*bs*S*8*D*D + 2*bs*S*8*D*D)*num_l*decoding_step
+                if phase == "prefill":
+                    S = seq_len['Decoder']
+                    flops["t2tt_decoder"]["StandardMultiheadAttention1"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
+                    flops["t2tt_decoder"]["StandardMultiheadAttention2"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
+                    flops["t2tt_decoder"]["StandardFeedForwardNetwork"] = (2*bs*S*8*D*D + 2*bs*S*8*D*D)*num_l
+                else:
+                    S = 1
+                    flops["t2tt_decoder"]["StandardMultiheadAttention1"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l*decoding_step
+                    flops["t2tt_decoder"]["StandardMultiheadAttention2"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l*decoding_step
+                    flops["t2tt_decoder"]["StandardFeedForwardNetwork"] = (2*bs*S*8*D*D + 2*bs*S*8*D*D)*num_l*decoding_step
 
 
-                if task=="T2ST" or task=="S2ST":
-                    flops["nar_t2u"] = dict()
-                    S = seq_len['NART_Decoder']
-                    num_l = n_layer["NAR"]
-                    flops["nar_t2u"]["encoder"] = dict()
-                    flops["nar_t2u"]["encoder"]["StandardMultiheadAttention"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
-                    flops["nar_t2u"]["encoder"]["StandardFeedForwardNetwork"] = (2*bs*S*8*D*D + 2*bs*S*8*D*D)*num_l
+                if phase == "prefill":
+                    if task=="T2ST" or task=="S2ST":
+                        flops["nar_t2u"] = dict()
+                        S = seq_len['NART_Decoder']
+                        num_l = n_layer["NAR"]
+                        flops["nar_t2u"]["encoder"] = dict()
+                        flops["nar_t2u"]["encoder"]["StandardMultiheadAttention"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
+                        flops["nar_t2u"]["encoder"]["StandardFeedForwardNetwork"] = (2*bs*S*8*D*D + 2*bs*S*8*D*D)*num_l
 
-                    flops["nar_t2u"]["decoder"] = dict()
-                    S = seq_len['NART_Decoder']
-                    flops["nar_t2u"]["decoder"]["StandardMultiheadAttention"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
-                    IN=1024; OUT=1024
-                    flops["nar_t2u"]["decoder"]["conv1d"] = get_conv1d(IN, OUT, 7, 1)*num_l
-                    IN=1024; OUT=1024
-                    flops["nar_t2u"]["decoder"]["conv1d2"] = get_conv1d(IN, OUT, 7, 1)*num_l
-                    flops["nar_t2u"]["decoder"]["tiedprojection"] = 2*bs*S*D*10082
+                        flops["nar_t2u"]["decoder"] = dict()
+                        S = seq_len['NART_Decoder']
+                        flops["nar_t2u"]["decoder"]["StandardMultiheadAttention"] = (24*bs*S*D*D + 4*bs*S*S*D)*num_l
+                        IN=1024; OUT=1024
+                        flops["nar_t2u"]["decoder"]["conv1d"] = get_conv1d(IN, OUT, 7, 1)*num_l
+                        IN=1024; OUT=1024
+                        flops["nar_t2u"]["decoder"]["conv1d2"] = get_conv1d(IN, OUT, 7, 1)*num_l
+                        flops["nar_t2u"]["decoder"]["tiedprojection"] = 2*bs*S*D*10082
 
-                    
-                    flops["vocoder"] = dict()
-                    S = seq_len['Vocoder']
-                    IN=256; OUT=256
-                    for i in range(15):
-                        flops["vocoder"][i] = dict()
+                        
+                        flops["vocoder"] = dict()
+                        S = seq_len['Vocoder']
+                        IN=256; OUT=256
+                        for i in range(15):
+                            flops["vocoder"][i] = dict()
 
-                    flops["vocoder"][0]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 3, 3) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 5, 5)
-                    flops["vocoder"][0]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
-                    flops["vocoder"][1]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 9, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 15, 5)
-                    flops["vocoder"][1]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
-                    flops["vocoder"][2]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 15, 3) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 25, 5)
-                    flops["vocoder"][2]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
+                        flops["vocoder"][0]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 3, 3) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 5, 5)
+                        flops["vocoder"][0]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
+                        flops["vocoder"][1]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 9, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 15, 5)
+                        flops["vocoder"][1]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
+                        flops["vocoder"][2]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 15, 3) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 25, 5)
+                        flops["vocoder"][2]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
 
-                    IN=128; OUT=128
-                    flops["vocoder"][3]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 3, 3) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 5, 5)
-                    flops["vocoder"][3]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
-                    flops["vocoder"][4]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 9, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 15, 5)
-                    flops["vocoder"][4]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
-                    flops["vocoder"][5]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 15, 3) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 25, 5)
-                    flops["vocoder"][5]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
+                        IN=128; OUT=128
+                        flops["vocoder"][3]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 3, 3) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 5, 5)
+                        flops["vocoder"][3]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
+                        flops["vocoder"][4]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 9, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 15, 5)
+                        flops["vocoder"][4]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
+                        flops["vocoder"][5]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 15, 3) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 25, 5)
+                        flops["vocoder"][5]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
 
-                    IN=64; OUT=64
-                    flops["vocoder"][6]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 3, 3) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 5, 5)
-                    flops["vocoder"][6]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
-                    flops["vocoder"][7]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 9, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 15, 5)
-                    flops["vocoder"][7]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
-                    flops["vocoder"][8]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 15, 3) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 25, 5)
-                    flops["vocoder"][8]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
+                        IN=64; OUT=64
+                        flops["vocoder"][6]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 3, 3) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 5, 5)
+                        flops["vocoder"][6]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
+                        flops["vocoder"][7]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 9, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 15, 5)
+                        flops["vocoder"][7]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
+                        flops["vocoder"][8]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 15, 3) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 25, 5)
+                        flops["vocoder"][8]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
 
-                    IN=32; OUT=32
-                    flops["vocoder"][9]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 3, 3) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 5, 5)
-                    flops["vocoder"][9]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
-                    flops["vocoder"][10]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 9, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 15, 5)
-                    flops["vocoder"][10]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
-                    flops["vocoder"][11]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 15, 3) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 25, 5)
-                    flops["vocoder"][11]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
+                        IN=32; OUT=32
+                        flops["vocoder"][9]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 3, 3) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 5, 5)
+                        flops["vocoder"][9]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
+                        flops["vocoder"][10]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 9, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 15, 5)
+                        flops["vocoder"][10]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
+                        flops["vocoder"][11]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 15, 3) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 25, 5)
+                        flops["vocoder"][11]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
 
-                    IN=16; OUT=16
-                    flops["vocoder"][12]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 3, 3) + \
-                                                    get_conv1d(IN, OUT, 3, 1, 5, 5)
-                    flops["vocoder"][12]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
-                    flops["vocoder"][13]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 9, 3) + \
-                                                    get_conv1d(IN, OUT, 7, 1, 15, 5)
-                    flops["vocoder"][13]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
-                    flops["vocoder"][14]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 15, 3) + \
-                                                    get_conv1d(IN, OUT, 11, 1, 25, 5)
-                    flops["vocoder"][14]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
+                        IN=16; OUT=16
+                        flops["vocoder"][12]["convs1"] = get_conv1d(IN, OUT, 3, 1, 1) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 3, 3) + \
+                                                        get_conv1d(IN, OUT, 3, 1, 5, 5)
+                        flops["vocoder"][12]["convs2"] = get_conv1d(IN, OUT, 3, 1, 1)*3
+                        flops["vocoder"][13]["convs1"] = get_conv1d(IN, OUT, 7, 1, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 9, 3) + \
+                                                        get_conv1d(IN, OUT, 7, 1, 15, 5)
+                        flops["vocoder"][13]["convs2"] = get_conv1d(IN, OUT, 7, 1, 3)*3
+                        flops["vocoder"][14]["convs1"] = get_conv1d(IN, OUT, 11, 1, 5) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 15, 3) + \
+                                                        get_conv1d(IN, OUT, 11, 1, 25, 5)
+                        flops["vocoder"][14]["convs2"] = get_conv1d(IN, OUT, 11, 1, 5)*3
 
-                    flops["vocoder"]["conv_post"] = get_conv1d(16, 1, 7, 1, 3)
+                        flops["vocoder"]["conv_post"] = get_conv1d(16, 1, 7, 1, 3)
 
-                    flops["vocoder"]["dur_predictor"] = dict()
-                    flops["vocoder"]["dur_predictor"]["conv1"] = get_conv1d(1280, 1280, 3, 1)
-                    flops["vocoder"]["dur_predictor"]["conv2"] = get_conv1d(1280, 1280, 3, 1)
-                    flops["vocoder"]["dur_predictor"]["linear"] = bs*S
+                        flops["vocoder"]["dur_predictor"] = dict()
+                        flops["vocoder"]["dur_predictor"]["conv1"] = get_conv1d(1280, 1280, 3, 1)
+                        flops["vocoder"]["dur_predictor"]["conv2"] = get_conv1d(1280, 1280, 3, 1)
+                        flops["vocoder"]["dur_predictor"]["linear"] = bs*S
                 return flops
             elif model == "hstu":
                 embedding_dim=512
@@ -578,12 +600,12 @@ if __name__ == '__main__':
 
 
         data = [
-            ('[I2T] MSCOCO', collect_data('MSCOCO', batch_dict['MSCOCO'], n_layer=48)),
+            ('[T2I] Coco_Image', collect_data('Coco_Image', batch_dict['Coco_Image'], n_layer=48)),
+            # ('[I2T] MSCOCO', collect_data('MSCOCO', batch_dict['MSCOCO'], n_layer=48)),
             # ('[I2T] Flickr30k', collect_data('Flickr30k', batch_dict['Flickr30k'], n_layer=48)),
             # ('[IT2T] TextVQA', collect_data('TextVQA', batch_dict['TextVQA'], n_layer=48)),
             # ('[IT2T] OKVQA', collect_data('OKVQA', batch_dict['OKVQA'], n_layer=48)),
             ('[IT2T] Vizwiz', collect_data('Vizwiz', batch_dict['Vizwiz'], n_layer=48)),
-            ('[T2I] Coco_Image', collect_data('Coco_Image', batch_dict['Coco_Image'], n_layer=48)),
             # ('[T2I] Partiprompts', collect_data('Partiprompts', batch_dict['Partiprompts'], n_layer=48)),
             ('[S2ST] Fleurs', collect_data('S2ST', batch_dict['S2ST'], model="seamless")),
             # ('[S2TT] Fleurs', collect_data('S2TT', batch_dict['S2TT'], model="seamless")),
@@ -606,7 +628,7 @@ if __name__ == '__main__':
         '[IT2T] OKVQA': cmap[5],
         '[IT2T] Vizwiz': cmap[6],
         '[T2I] Coco_Image': cmap[8],
-        '[T2I] Partiprompts': cmap[9],
+        '[T2I] Partiprompts': cmap[10],
         # '[T2T] Hellaswag': cmap[8],
         # '[T2T] Arc_easy': cmap[9],
         '[S2ST] Fleurs': cmap[12],
@@ -616,7 +638,7 @@ if __name__ == '__main__':
         '[T2T] HumanEval': cmap[14],
         '[T2T] MBPP': cmap[14],
         '[F2F] HSTU-Triton': cmap[3],
-        '[F2F] HSTU-Pytorch': cmap[3]
+        '[F2F] HSTU-Pytorch': cmap[10]
     }
     
     gathered_data = dict()
@@ -640,6 +662,10 @@ if __name__ == '__main__':
         for idx, bs in enumerate(batch_size):
             data = gathered_data[ns][idx]
             print("num shot: ", ns, bs)
+            
+            for idx in range(len(data)):
+                data[idx] = (data[idx][0], [np.log2(dd) for dd in data[idx][1]])
+
             for d in data:
                 print(d)
 
@@ -671,12 +697,13 @@ if __name__ == '__main__':
                     lab.append([int((ceil(md/div)*div)/5*(i+1)) for i in range(5)])
 
 
-            fig = plt.figure(figsize=(10, 10))#, layout='tight')
+            fig = plt.figure(figsize=(25, 15))#, layout='tight')
 
             radar = Radar(fig, tit)#, lab)
             
             for d in data:
                 radar.plot([dd/(max_d/5) if dd>0 else (dd+shift)/(max_d/5) for idx, (dd, max_d) in enumerate(zip(d[1], max_data))], '-', lw=2, marker='o', color=colormap[d[0]], alpha=1, label=d[0])
+                # radar.plot([dd/(max_d/5) if dd>0 else (dd+shift)/(max_d/5) for idx, (dd, max_d) in enumerate(zip(d[1], max_data))], '-', lw=2, marker='o', alpha=1, label=d[0])
                 # radar.plot(d[1], '-', lw=2, marker='o', color=colormap[d[0]], alpha=1, label=d[0])
 
 
@@ -684,7 +711,8 @@ if __name__ == '__main__':
             # radar.ax.set_yticklabels([])
             radar.ax.get_yaxis().set_ticklabels([])
             # radar.ax.set_title("# Shot "+str(ns) + " / # GPU " + str(n_gpu) + " / Batch size "+str(bs), fontsize=18)
-            fig.show()
+            # plt.tight_layout()
+            plt.show()
             # fig.savefig('/fsx-atom/yejinlee/analysis_figures/star_chart/num_shot'+str(ns)+'_bs1.pdf')
             # print("Saving to "+ '/fsx-atom/yejinlee/analysis_figures/star_chart/num_shot'+str(ns)+'_bs1.pdf')
             dump_dir = '/Users/yejinlee/hpca_2025/onellm_scripts/analysis_figures/star_chart'
@@ -693,4 +721,37 @@ if __name__ == '__main__':
             print("Saving to "+ dump_dir+'/num_shot'+str(ns)+re.sub(re.compile(r'\s+'), '', str(bs))+'.pdf')
 
 
+# # %%
+# import matplotlib.pyplot as plt
+# import numpy as np
+
+# # Data provided
+# workloads = [
+#     ('[T2I] Coco_Image', [70.5739129601582, 69.60361074256897, 111848.71096086502, 64.06091666666667]),
+#     ('[IT2T] Vizwiz', [71.3904297263387, 67.71637010574341, 928.5574297740466, 68.00027060662191]),
+#     ('[S2ST] Fleurs', [1.1154353289291992, 4.53429541654572, 732.7436028891367, 21.382975865940686]),
+#     ('[T2T] HumanEval', [34.78306411373324, 64.26199169275237, 36384.11167045919, 60.21086071273065]),
+#     ('[F2F] HSTU-Pytorch', [0.635750999674201, 1.768801212310791, 46.07397492509335, 81.35943603515625])
+# ]
+
+# # Extracting data for plotting
+# workload_names = [workload[0] for workload in workloads]
+# categories = ['Computation', 'Memory Consumption', 'Latency', 'GPU Utilization']
+# values = np.array([[np.log2(w) for w in workload[1]] for workload in workloads])
+
+# # Plotting the parallel coordinates
+# plt.figure(figsize=(10, 6))
+# plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
+# plt.title('Parallel Coordinate Graph for Workloads')
+
+# for i in range(len(workload_names)):
+#     plt.plot(categories, values[i], marker='o', label=workload_names[i])
+
+# plt.xlabel('Categories')
+# plt.ylabel('Values')
+# plt.xticks(rotation=45)
+# plt.legend()
+# plt.grid(True)
+# plt.tight_layout()
+# plt.show()
 # %%
