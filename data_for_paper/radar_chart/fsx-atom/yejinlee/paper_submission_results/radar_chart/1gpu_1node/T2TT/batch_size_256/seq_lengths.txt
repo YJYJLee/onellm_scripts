@@ -1,4 +1,4 @@
-Encoder	Decoder
-65	1
-80	1
-55	1
+Encoder	Encoder	Encoder	Decoder	Decoder	Decoder
+65	65	1	1	33.9375	80	
+80	80	1	1	36.83984375	95	
+55	55	1	1	35.18320610687023	65	
