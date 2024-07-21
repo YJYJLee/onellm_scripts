@@ -193,20 +193,20 @@ for i in range(len(bp)):
                 alpha = 0.5)
         
 
-ax1.set_yticklabels(["MSCOCO",
+ax1.set_yticklabels(["I-T (Chamaleon)",  # MSCOCO
 # "Flickr30k",
 # "TextVQA",
 # "OKVQA",
-"Vizwiz",
-"Coco_Image",
+"IT-T (Chamaleon)",    # Vizwiz
+"T-I (Chamaleon)", # Coco image
 # "Partiprompts",
-"HumanEval",
+"T-T (Llama)",  # HumanEval
 # "MBPP",
-"S2ST",
-"S2TT",
-"T2ST",
-"T2TT",
-"HSTU-Pytorch"]*3)
+"S-S (Seamless)",
+"S-T(Seamless)",
+"T-S(Seamless)",
+"T-T(Seamless)",
+"(HSTU)"]*3)
 
 
 # # Adding title 
@@ -223,3 +223,4 @@ dump_dir = '/Users/yejinlee/hpca_2025/onellm_scripts/analysis_figures/latency_di
 os.makedirs(dump_dir, exist_ok=True)
 f.savefig(dump_dir+'/whisker.pdf', bbox_inches = 'tight')
 print("Saving to "+ dump_dir+'/whisker.pdf')
+# %%
