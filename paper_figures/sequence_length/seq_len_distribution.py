@@ -6,7 +6,7 @@ import re
 from matplotlib import colormaps
 from math import nan, isnan, ceil
 
-DIR_PREFIX="/Users/yejinlee/hpca_2025/onellm_scripts/data_for_paper/radar_chart/"
+DIR_PREFIX="/data/home/yejinlee/RAG/onellm-eval/onellm_scripts/data_for_paper/radar_chart/"
 
 n_gpu = 1
 
@@ -172,12 +172,12 @@ if __name__ == '__main__':
             ('[T2I] Coco_Image', collect_data('Coco_Image')),
             ('[T2I] Partiprompts', collect_data('Partiprompts')),
             ('[S2ST] Fleurs', collect_data('S2ST', model="seamless")),
-            # ('[S2TT] Fleurs', collect_data('S2TT', model="seamless")),
-            # ('[T2TT] Fleurs', collect_data('T2TT', model="seamless")),
-            # ('[T2ST] Fleurs', collect_data('T2ST', model="seamless")),
+            ('[S2TT] Fleurs', collect_data('S2TT', model="seamless")),
+            ('[T2ST] Fleurs', collect_data('T2ST', model="seamless")),
+            ('[T2TT] Fleurs', collect_data('T2TT', model="seamless")),
             ('[T2T] HumanEval', collect_data('HumanEval')),
             ('[T2T] MBPP', collect_data('MBPP')),
-            # ('[] HSTU', collect_data('HSTU-Pytorch', model="hstu")),
+            ('[] HSTU', collect_data('HSTU-Pytorch', model="hstu")),
         ]
         # data = [list(i) for i in zip(*data)]
         return data
@@ -189,7 +189,14 @@ if __name__ == '__main__':
             if "HSTU" in sl[0]:
                 print('{0: <20}'.format(sl[0]), ''.join(['{0: <16}'.format(ss) for ss in [f"{s:.2f}" for s in sl[1]["l1"]]]))
             elif "Fleurs" in sl[0]:
-                print('{0: <20}'.format(sl[0]), ''.join(['{0: <16}'.format(ss) for ss in [f"{s:.2f}" for s in sl[1]["l1"]]]))
+                print('{0: <20}'.format(sl[0]), ''.join(['{0: <16}'.format(ss) for ss in [f"{s:.2f}" for s in sl[1]["Encoder"][:4]]]) \
+                      + (''.join(['{0: <16}'.format(ss) for ss in [f"{s:.2f}" for s in sl[1]["Decoder"][4:-1]]]) if "TT" in sl[0] else ''.join(['{0: <16}'.format(ss) for ss in [f"{s:.2f}" for s in sl[1]["NART_Decoder"][4:-1]]])) \
+                      +  (''.join(['{0: <16}'.format(ss) for ss in [f"{s:.2f}" for s in sl[1]["Decoder"][-1:]]]))
+                )
+                # if "TT" in sl[0]:
+                #     print('{0: <20}'.format(sl[0]), ''.join(['{0: <16}'.format(ss) for ss in [f"{s:.2f}" for s in sl[1]["Decoder"]]]))
+                # elif "ST" in sl[0]:
+                #     print('{0: <20}'.format(sl[0]), ''.join(['{0: <16}'.format(ss) for ss in [f"{s:.2f}" for s in sl[1]["NART_Decoder"]]]))
         else:
             print('{0: <20}'.format(sl[0]), ''.join(['{0: <16}'.format(ss) for ss in [f"{s:.2f}" for s in sl[1]]]))
 

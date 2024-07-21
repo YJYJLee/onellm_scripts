@@ -1,4 +1,4 @@
-Encoder	Decoder	Decode	NART_Encoder	NART_Decoder	Vocoder
-65	1	80	80	80	779
-80	1	94	94	94	1030
-55	1	64	64	64	746
+Encoder	Encoder	Encoder	Decoder	Decoder	Decoder	Decode	Decode	Decode	NART_Encoder	NART_Encoder	NART_Encoder	NART_Decoder	NART_Decoder	NART_Decoder	Vocoder	Vocoder	Vocoder
+65	65	1	1	33.9375	80	80	80	1	80	80	1	80	779	1	779	249280	1	
+80	80	1	1	36.83984375	95	94	94	1	94	94	1	94	1030	1	1030	329600	1	
+55	55	1	1	35.18320610687023	65	64	64	1	64	64	1	64	746	1	746	238720	1	
