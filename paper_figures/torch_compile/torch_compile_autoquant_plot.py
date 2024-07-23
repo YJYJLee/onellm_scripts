@@ -11,7 +11,7 @@ n_gpu=1
 ns=0
 
 # DIR_PREFIX="./onellm_scripts/data_for_paper/compile_graph/"
-DIR_PREFIX="/Users/yejinlee/hpca_2025/onellm_scripts/data_for_paper/compile_graph/"
+DIR_PREFIX="/data/home/yejinlee/RAG/onellm-eval/onellm_scripts/data_for_paper/compile_graph/"
 
 
 def reject_outliers(data, m=2.):

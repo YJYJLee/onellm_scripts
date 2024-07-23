@@ -8,7 +8,7 @@ from matplotlib import colormaps
 
 
 # DIR_PREFIX=""
-DIR_PREFIX="/Users/yejinlee/hpca_2025/onellm_scripts/data_for_paper/latency_dist/"
+DIR_PREFIX="/data/home/yejinlee/RAG/onellm-eval/onellm_scripts/data_for_paper/latency_dist/"
 
 def get_timer_result_folder(dataset):
     if dataset == "MSCOCO":
@@ -95,6 +95,12 @@ def get_latency_dist(dataset):
     return latencies
 
 data = list()
+data.append(get_latency_dist("HSTU-Pytorch"))
+
+data.append(get_latency_dist("S2ST"))
+data.append(get_latency_dist("S2TT"))
+data.append(get_latency_dist("T2ST"))
+data.append(get_latency_dist("T2TT"))
 data.append(get_latency_dist("MSCOCO"))
 # data.append(get_latency_dist("Flickr30k"))
 # data.append(get_latency_dist("TextVQA"))
@@ -103,12 +109,7 @@ data.append(get_latency_dist("Vizwiz"))
 data.append(get_latency_dist("Coco_Image"))
 # data.append(get_latency_dist("Partiprompts"))
 data.append(get_latency_dist("HumanEval"))
-# data.append(get_latency_dist("MBPP"))
-data.append(get_latency_dist("S2ST"))
-data.append(get_latency_dist("S2TT"))
-data.append(get_latency_dist("T2ST"))
-data.append(get_latency_dist("T2TT"))
-data.append(get_latency_dist("HSTU-Pytorch"))
+data.append(get_latency_dist("MBPP"))
 
 plt.figure(figsize=(64, 3))
 
@@ -126,7 +127,7 @@ bp.append(ax3.boxplot(data, patch_artist = True,
  
 
 
-ax1.set_xlim(45.5,46.5)  # x-axis range limited to 0 - 100 
+ax1.set_xlim(45,47)  # x-axis range limited to 0 - 100 
 ax2.set_xlim(100,7000)  # x-axis range limited to 0 - 100 
 ax3.set_xlim(107900, 108400)  # x-axis range limited to 250 - 300
 
@@ -175,8 +176,8 @@ for i in range(len(bp)):
     # changing color and linewidth of
     # caps
     for cap in bp[i]['caps']:
-        cap.set(color ='#8B008B',
-        # cap.set(color ='purple',
+        # cap.set(color ='#8B008B',
+        cap.set(color ='purple',
                 linewidth = 2)
     
     # changing color and linewidth of
@@ -193,20 +194,41 @@ for i in range(len(bp)):
                 alpha = 0.5)
         
 
-ax1.set_yticklabels(["I-T (Chamaleon)",  # MSCOCO
+ax1.set_yticklabels([
+"[H-A] Synthetic",
+"[S-S] Fleurs",
+"[S-T] Fleurs",
+"[T-S] Fleurs",
+"[T-T] Fleurs",
+"[I-T] MSCOCO",
 # "Flickr30k",
 # "TextVQA",
 # "OKVQA",
-"IT-T (Chamaleon)",    # Vizwiz
-"T-I (Chamaleon)", # Coco image
+"[IT-T] Vizwiz",
+"[T-I] Coco_Image",
 # "Partiprompts",
-"T-T (Llama)",  # HumanEval
-# "MBPP",
-"S-S (Seamless)",
-"S-T(Seamless)",
-"T-S(Seamless)",
-"T-T(Seamless)",
-"(HSTU)"]*3)
+"[T-T] HumanEval",
+"[T-T] MBPP",
+]*3)
+
+
+
+sec = ax1.secondary_yaxis(location=0)
+sec.set_yticks([9.5, 7, 3.5, 1], labels=["Llama                          ", 
+                                         "Chameleon                      ", 
+                                         "Seamless                       ",
+                                         "HSTU                           "], fontsize=12)
+# sec.set_yticklabels([])
+# sec.get_yaxis().set_visible(False)
+
+
+sec2 = ax1.secondary_yaxis(location=0)
+# sec2.set_yticks([1.5, 5.5, 8.5], labels=[])
+sec2.set_yticks([0.5, 1.5, 5.5, 8.5, 10.5], labels=[])
+sec2.tick_params('y', length=160, width=0.8)
+ax1.set_ylim(0.5, 10.5)
+
+# f.xlabel("Inference Time (ms)", fontsize=10) 
 
 
 # # Adding title 
@@ -216,11 +238,10 @@ ax1.set_yticklabels(["I-T (Chamaleon)",  # MSCOCO
 # ticks
 ax1.get_xaxis().tick_bottom()
 ax1.get_yaxis().tick_left()
-     
+
 # show plot
 plt.show()
-dump_dir = '/Users/yejinlee/hpca_2025/onellm_scripts/analysis_figures/latency_dist'
+dump_dir = '/data/home/yejinlee/RAG/onellm-eval/onellm_scripts/analysis_figures/latency_dist'
 os.makedirs(dump_dir, exist_ok=True)
 f.savefig(dump_dir+'/whisker.pdf', bbox_inches = 'tight')
 print("Saving to "+ dump_dir+'/whisker.pdf')
-# %%

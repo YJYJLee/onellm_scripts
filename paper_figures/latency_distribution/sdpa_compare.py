@@ -12,7 +12,7 @@ ns=0
 
 # DIR_PREFIX=""
 # DIR_PREFIX="./onellm_scripts/data_for_paper/latency_dist/"
-DIR_PREFIX="/Users/yejinlee/hpca_2025/onellm_scripts/data_for_paper/latency_dist/"
+DIR_PREFIX="/data/home/yejinlee/RAG/onellm-eval/onellm_scripts/data_for_paper/latency_dist/"
 
 def reject_outliers(data, m=2.):
     d = np.abs(data - np.median(data))

@@ -6,7 +6,8 @@ import numpy as np
 import math
 
 # DIR_PREFIX=""
-DIR_PREFIX="./onellm_scripts/data_for_paper/latency_dist"
+# DIR_PREFIX="./onellm_scripts/data_for_paper/latency_dist"
+DIR_PREFIX="/data/home/yejinlee/RAG/onellm-eval/onellm_scripts/data_for_paper/latency_dist/"
 
 def get_timer_result_folder(dataset):
     if dataset == "MSCOCO":
