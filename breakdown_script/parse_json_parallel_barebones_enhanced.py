@@ -2952,82 +2952,57 @@ else:
         for file_path in [
             path for path in glob.glob(args.json_folder + "/profile_sample_*")
         ]:
-            if "txt_to_img" in file_path:
-                _sample_breakdown = dict()
-                for i in range(64, 1088, 64):
-                    profile_result = parse_file(
-                        file_path,
-                        plot_graph=False,
-                    )
-                    gather_result_separate(
-                        profile_result, _sample_breakdown, merge_sample=True
-                    )
-                    # print(">>>> : ", _sample_breakdown)
+            # if "t2i" in file_path:
+            #     sample_id = 500
+            #     _sample_breakdown = dict()
+            #     # for i in range(64, 1088, 64):
+            #     for i in range(64, 129, 64):
+            #         profile_result = parse_file(
+            #             file_path
+            #             + "profile_sample_"
+            #             + str(sample_id)
+            #             + "_"
+            #             + str(i)
+            #             + "_gpu_0.json",
+            #             file_path,
+            #             plot_graph=False,
+            #         )
+            #         gather_result_separate(
+            #             profile_result, _sample_breakdown, merge_sample=True
+            #         )
 
-                profile_result = parse_file(
-                    file_path,
-                    plot_graph=False,
-                )
-                for k, v in profile_result.items():
-                    if k not in _sample_breakdown:
-                        profile_result[k] = [0] * 1023 + v
-                gather_result_separate(
-                    profile_result, _sample_breakdown, merge_sample=True
-                )
+            #     gather_result_separate(_sample_breakdown, sample_breakdown)
+            #     print(sample_breakdown)
+            #     import pdb
 
-                gather_result_separate(_sample_breakdown, sample_breakdown)
-                # print("FINAL: ", sample_breakdown)
-            else:
+            #     pdb.set_trace()
+            #     exit(0)
+
+            # else:
+            try:
                 profile_result = parse_file(file_path, plot_graph=False)
                 # profile_result = {'(Preprocessing) Encode Image': [15.238000000000008, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'Misc': [8.823000000000006, 0.43800000000000033, 0.4280000000000003, 0.43200000000000033, 0.4270000000000003, 0.4230000000000003, 0.4230000000000003, 0.4250000000000003, 0.43300000000000033, 0.43400000000000033], 'LayerNorm': [12.997999999999998, 3.6359999999999952, 3.5939999999999954, 3.5929999999999964, 3.5909999999999953, 3.5889999999999964, 3.584999999999997, 3.5929999999999964, 3.586999999999996, 3.5989999999999958], 'Copy': [0.352, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004], 'Scoring': [0.06300000000000001, 0.08300000000000002, 0.08200000000000002, 0.08100000000000002, 0.08300000000000003, 0.08200000000000002, 0.08100000000000002, 0.08500000000000002, 0.08300000000000002, 0.08500000000000002], 'Linear': [315.8960000000001, 40.487999999999936, 40.42199999999994, 40.40599999999994, 40.48999999999995, 40.45299999999991, 40.40899999999992, 40.46499999999993, 40.48299999999995, 40.487999999999914], 'Embedding': [0.092, 0.004, 0.003, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003], 'Attention': [26.062999999999988, 6.31099999999998, 6.221999999999979, 6.220999999999983, 6.248999999999979, 6.246999999999986, 6.252999999999983, 6.2619999999999845, 6.259999999999983, 6.255999999999982], 'Idle': [-9.727000000000032, 97.79900000000009, 92.46100000000007, 103.96900000000008, 90.72800000000007, 83.71700000000011, 107.91000000000008, 97.30100000000007, 98.40400000000008, 106.65400000000011]}
                 for idle in profile_result["Idle"]:
                     assert idle >= 0, idle
                 gather_result_separate(profile_result, sample_breakdown)
-
-        prefill_breakdown = dict()
-        decode_breakdown = dict()
-        print(sample_breakdown)
+            except:
+                print("????")
+                pass
         for k, v in sample_breakdown.items():
-            prefill_breakdown[k] = np.average([vv[0] for vv in v])
-            decode_breakdown[k] = np.average([sum(vv[1:]) for vv in v])
+            print(k, np.average([vv[0] for vv in v]))
 
-        for k, v in prefill_overall_breakdown.items():
-            if k in sample_breakdown:
-                prefill_overall_breakdown[k].append(prefill_breakdown[k])
-            else:
-                prefill_overall_breakdown[k].append(0)
+        # prefill_breakdown = dict()
+        # decode_breakdown = dict()
+        # for k, v in sample_breakdown.items():
+        #     prefill_breakdown[k] = np.average([vv[0] for vv in v])
+        #     decode_breakdown[k] = np.average([sum(vv[1:]) for vv in v])
 
-        for k, v in decode_overall_breakdown.items():
-            if k in sample_breakdown:
-                decode_overall_breakdown[k].append(decode_breakdown[k])
-            else:
-                decode_overall_breakdown[k].append(0)
-
-        if "1gpu_1node" in args.json_folder:
-            if "Communication" in prefill_breakdown:
-                del prefill_overall_breakdown["Communication"]
-            if "Communication" in decode_overall_breakdown:
-                del decode_overall_breakdown["Communication"]
-
-        del_keys = list()
-        for k, v in prefill_overall_breakdown.items():
-            if (
-                sum(v) == 0
-                and k in decode_overall_breakdown
-                and sum(decode_overall_breakdown[k]) == 0
-            ):
-                del_keys.append(k)
-
-        for k in del_keys:
-            del prefill_overall_breakdown[k]
-            del decode_overall_breakdown[k]
-
-        print("Prefill")
-        for k, v in prefill_overall_breakdown.items():
-            print(k, v[0].item())
-        print("Decode")
-        for k, v in decode_overall_breakdown.items():
-            print(k, v[0].item())
+        # print("Prefill")
+        # for k, v in prefill_breakdown.items():
+        #     print(k, v)
+        # print("Decode")
+        # for k, v in decode_breakdown.items():
+        #     print(k, v)
 
     else:
         # if args.json_file:
