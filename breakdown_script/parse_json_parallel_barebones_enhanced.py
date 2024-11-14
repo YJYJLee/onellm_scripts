@@ -23,7 +23,7 @@ import glob
 import pickle
 from tqdm import tqdm
 
-DIR_PREFIX="./onellm_scripts/data_for_paper/pickle_dumps/"
+DIR_PREFIX="/fsx-checkpoints/yejinlee/onellm_restore/yejinlee/onellm_scripts/data_for_paper/pickle_dumps/"
 
 # Initialize ArgParser:
 parser = argparse.ArgumentParser("argparser")
@@ -865,7 +865,9 @@ def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, ke
         value2 = list()
         value1_real = list()
         value2_real = list()
+        print(k)
         for idxidx, vv in enumerate(kernel_breakdown[k]):
+            print(xlabel[idxidx])
             if idxidx<num_separated_bar:
                 value1.append(vv/total_time[idxidx]*100)
                 value2.append(compare_breakdown[k][idxidx]/total_time_compare[idxidx]*100)
@@ -873,11 +875,15 @@ def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, ke
                 value2_real.append(compare_breakdown[k][idxidx])
                 label1[idxidx] -= shift
                 label2[idxidx] += shift
+                print("Prefill: ", vv/total_time[idxidx]*100)
+                print("Decode: ", compare_breakdown[k][idxidx]/total_time_compare[idxidx]*100)
+                # print("Ratio: ", (vv+compare_breakdown[k][idxidx])/(total_time[idxidx]+total_time_compare[idxidx])*100)
             else:
                 value1.append(0)
                 value2.append(vv/total_time[idxidx]*100 if total_time[idxidx]>0 else 0)
                 value1_real.append(0)
                 value2_real.append(vv)
+                print("Ratio: ", vv/total_time[idxidx]*100 if total_time[idxidx]>0 else 0)
 
         ax.bar(label1, value1,  bottom=bottom, label=k, color=cmap[k], width=0.35)
         ax.bar(label2, value2, bottom=bottom_compare, color=cmap[k], width=0.35)
@@ -902,9 +908,9 @@ def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, ke
         else:
             times.append(b/baseline)
 
-    plt.ylim(0,108)
+    plt.ylim(0,103)
 
-    ax.legend(fontsize=4, ncol=8, bbox_to_anchor=(0.45, 1.1), loc="upper center")
+    ax.legend(fontsize=6, ncol=4, bbox_to_anchor=(0.45, 1.35), loc="upper center")
     xxlabel = [val for pair in zip([xx-shift for xx in x[:num_separated_bar]], [xx+shift for xx in x[:num_separated_bar]]) for val in pair]+list(x[num_separated_bar:])
     plt.xticks(xxlabel, ["P", "D"]*num_separated_bar + [""]*(len(x)-num_separated_bar), fontsize=6)
     # ax.set_xticks(ax.get_xticks()[:8])
@@ -912,25 +918,25 @@ def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, ke
     sec = ax.secondary_xaxis(location=0)
     sec.set_xticks(x, labels=["\n"+xl for xl in xlabel], fontsize=6)
 
-    print(times)
-    # Set an offset that is used to bump the label up a bit above the bar.
-    y_offset = 102
-    # Add labels to each bar.
-    for i, t in enumerate(times):
-        if i < num_separated_bar*2:
-            if i==0:
-                ax.text(i//2-shift, y_offset, f'{baseline:.1f}ms', ha='center', weight='bold', fontsize=3)
-            elif i%2==1:
-                ax.text(i//2+shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=3)    
-            else:
-                ax.text(i//2-shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=3)
+    # print(times)
+    # # Set an offset that is used to bump the label up a bit above the bar.
+    # y_offset = 102
+    # # Add labels to each bar.
+    # for i, t in enumerate(times):
+    #     if i < num_separated_bar*2:
+    #         if i==0:
+    #             ax.text(i//2-shift, y_offset+6, f'{baseline:.1f}ms', ha='center', weight='bold', fontsize=4.5)
+    #         elif i%2==1:
+    #             ax.text(i//2+shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)    
+    #         else:
+    #             ax.text(i//2-shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)
 
-        else:
-            ax.text(i-num_separated_bar, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=3)    
+    #     else:
+    #         ax.text(i-num_separated_bar, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)    
 
 
     sec = ax.secondary_xaxis(location=0)
-    sec.set_xticks([0, 2, 4, 6.5], labels=["\n\n"+xl for xl in secondary_xlabel], fontsize=6)
+    sec.set_xticks([0, 2, 5.5, 8], labels=["\n\n"+xl for xl in secondary_xlabel], fontsize=6)
     # sec.tick_params(bottom = False) 
     # sec.set_xticklabels([])
     sec.set(xlabel=None)
@@ -938,9 +944,9 @@ def graph_overall_compare_separate_ratio(kernel_breakdown, compare_breakdown, ke
 
 
     sec2 = ax.secondary_xaxis(location=0)
-    sec2.set_xticks([-0.5, 0.5, 3.5, 4.5, 8.5], labels=[])
+    sec2.set_xticks([0.5, 3.5, 7.5, 8.5], labels=[])
     sec2.tick_params('x', length=25, width=0.8)
-    ax.set_xlim(-0.5, 8.5)
+    ax.set_xlim(-0.65, 8.5)
 
     major_ticks = np.arange(0, 101, 20)
 
@@ -1595,18 +1601,18 @@ elif args.figure1_separate:
         "IT-T",
         "I-T",
         "T-I",
-        "",
         "S2TT",
         "S2ST",
         "T2TT",
         "T2ST",
+        "",
     ]
 
     model_name = [
         "Llama",
         "Chameleon",
+        "Seamless",
         "HSTU",
-        "Seamless"
     ]
 
     file_paths=[
@@ -1620,8 +1626,6 @@ elif args.figure1_separate:
         "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/img_to_txt/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco.0_shot.cm3v2_template.mbs.16.umca.True.gm.text.ev.False/",
         # Chameleon (Txt2Img)
         "/fsx-atom/yejinlee/cm3v2_breakdown_30B_final/1gpu_1node/txt_to_img/cm3v21_30b_test.mn.cm3v21_30b_test.t.coco_image.0_shot.bs.10.c.6.t.1.0.t.0.9.s.1.ncs.16.en.image_gen.g.True/%j/",
-        # HSTU
-        "/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_32/",
         # Seamless (S2TT)
         "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/S2TT/batch_size_128/",
         # Seamless (S2ST)
@@ -1630,6 +1634,8 @@ elif args.figure1_separate:
         "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2TT/batch_size_384/",
         # Seamless (T2ST)
         "/fsx-atom/yejinlee/paper_submission_results/seamless_breakdown/1gpu_1node/T2ST/batch_size_384/",
+        # HSTU
+        "/fsx-atom/yejinlee/paper_submission_results/hstu_paper_results/profile_results/pytorch/batch_size_32/",
     ]
     desired_prefixes_list=[
         # Codellama
@@ -1640,8 +1646,6 @@ elif args.figure1_separate:
         "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_PREPROC_ENCODE_IMAGES_AG*MODULE_POSTPROC_GENERATE_TEXT_AG",
         # Chameleon (Txt2Img)
         "MODULE_RowParallelLinear_AG*MODULE__InnerAttention_AG*MODULE_LayerNorm_AG*MODULE_ColumnParallelLinear_AG*MODULE_FusedRMSNorm_AG*MODULE_ParallelEmbedding_AG*MODULE_SCORING_AG*MODULE_POST_PROC_IMAGE_DECODE_AG",
-        # HSTU
-        "MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG",
         # # Seamless (S2TT)
         "MODULE_TorchSDPA_AG*MODULE_GLU_AG*MODULE_SiLU_AG*MODULE_Wav2Vec2FbankFeatureExtractor_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ReLU_AG*MODULE_Conv1d_AG*MODULE_Linear_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_Dropout_AG*MODULE_StandardEmbedding_AG*MODULE_StandardLayerNorm_AG*MODULE_TiedProjection_AG",
         # Seamless (S2ST)
@@ -1649,7 +1653,9 @@ elif args.figure1_separate:
         # Seamless (T2TT)
         "MODULE_Dropout_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_ReLU_AG*MODULE_KV_Cache_Reorder_AG*MODULE_Linear_AG*MODULE_TorchSDPA_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG",
         # Seamless (T2ST)
-        "MODULE_HardUpsampling_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ConvTranspose1d_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Linear_AG*MODULE_Masked_Select_AG*MODULE_Dropout_AG*MODULE_TorchSDPA_AG*MODULE_Conv1d_AG"
+        "MODULE_HardUpsampling_AG*MODULE_StandardLayerNorm_AG*MODULE_StandardEmbedding_AG*MODULE_SinusoidalPositionEncoder_AG*MODULE_TiedProjection_AG*MODULE_KV_Cache_Reorder_AG*MODULE_ConvTranspose1d_AG*MODULE_Embedding_AG*MODULE_ReLU_AG*MODULE_Linear_AG*MODULE_Masked_Select_AG*MODULE_Dropout_AG*MODULE_TorchSDPA_AG*MODULE_Conv1d_AG",
+        # HSTU
+        "MODULE_Embedding_AG*MODULE_Sigmoid_AG*MODULE_LayerNorm_AG*MODULE_Linear_AG*MODULE_Attention_AG",
     ]
 
     dp_collection = set()
