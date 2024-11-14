@@ -656,18 +656,50 @@ colormap2 = colormaps["Paired"].colors
 #     "Masked_Select": colormap2[11],
 # }
 
+# Used for paper submission
+# cmap = {
+#     "Embedding": colormap[0],
+#     "Misc": colormap[1],
+#     "Linear": colormap[2],
+#     "LayerNorm": colormap[3],
+#     "Attention": colormap[4],
+#     "Copy": colormap[5],
+#     "Conv1d": colormap2[6],
+#     "Idle": colormap[7],
+#     "KV_Cache_Reorder": colormap[10],
+# }
+
+# Used for rebuttal
+colormap = colormaps["tab10"].colors
+colormap2 = colormaps["Set2"].colors
+colormap3 = colormaps["Set3"].colors
+# colormap3 = colormaps["Set2"].colors
 
 cmap = {
     "Embedding": colormap[0],
-    "Misc": colormap[1],
-    "Linear": colormap[2],
+    "Misc": colormap3[11],
+    "Linear": colormap3[3],
     "LayerNorm": colormap[3],
-    "Attention": colormap[4],
+    "Attention": colormap2[2],
     "Copy": colormap[5],
-    "Conv1d": colormap2[6],
-    "Idle": colormap[7],
-    "KV_Cache_Reorder": colormap[10],
+    "Conv1d": colormap[6],
+    "Idle": colormap3[8],
+    "KV_Cache_Reorder": colormap3[0],
 }
+
+# colormap = colormaps["Accent"].colors
+
+# cmap = {
+#     "Embedding": colormap[0],
+#     "Misc": colormap[1],
+#     "Linear": colormap[2],
+#     "LayerNorm": colormap[4],
+#     "Attention": colormap[5],
+#     "Copy": colormap[6],
+#     "Conv1d": colormap[7],
+#     "Idle": colormap[8],
+#     "KV_Cache_Reorder": colormap[9],
+# }
 
 
 def prep_graph(nested=False):
@@ -1230,15 +1262,20 @@ def graph_overall_compare_separate_ratio(
         print(k)
         for idxidx, vv in enumerate(kernel_breakdown[k]):
             print(xlabel[idxidx])
-            if idxidx<num_separated_bar:
-                value1.append(vv/total_time[idxidx]*100)
-                value2.append(compare_breakdown[k][idxidx]/total_time_compare[idxidx]*100)
+            if idxidx < num_separated_bar:
+                value1.append(vv / total_time[idxidx] * 100)
+                value2.append(
+                    compare_breakdown[k][idxidx] / total_time_compare[idxidx] * 100
+                )
                 value1_real.append(vv)
                 value2_real.append(compare_breakdown[k][idxidx])
                 label1[idxidx] -= shift
                 label2[idxidx] += shift
-                print("Prefill: ", vv/total_time[idxidx]*100)
-                print("Decode: ", compare_breakdown[k][idxidx]/total_time_compare[idxidx]*100)
+                print("Prefill: ", vv / total_time[idxidx] * 100)
+                print(
+                    "Decode: ",
+                    compare_breakdown[k][idxidx] / total_time_compare[idxidx] * 100,
+                )
                 # print("Ratio: ", (vv+compare_breakdown[k][idxidx])/(total_time[idxidx]+total_time_compare[idxidx])*100)
             else:
                 value1.append(0)
@@ -1247,10 +1284,15 @@ def graph_overall_compare_separate_ratio(
                 )
                 value1_real.append(0)
                 value2_real.append(vv)
-                print("Ratio: ", vv/total_time[idxidx]*100 if total_time[idxidx]>0 else 0)
+                print(
+                    "Ratio: ",
+                    vv / total_time[idxidx] * 100 if total_time[idxidx] > 0 else 0,
+                )
 
         ax.bar(label1, value1, bottom=bottom, label=k, color=cmap[k], width=0.35)
         ax.bar(label2, value2, bottom=bottom_compare, color=cmap[k], width=0.35)
+        # ax.bar(label1, value1, bottom=bottom, label=k, width=0.35)
+        # ax.bar(label2, value2, bottom=bottom_compare, width=0.35)
         bottom = np.add(bottom, value1)
         bottom_compare = np.add(bottom_compare, value2)
         bottom_real = np.add(bottom_real, value1_real)
@@ -1271,11 +1313,22 @@ def graph_overall_compare_separate_ratio(
         else:
             times.append(b / baseline)
 
-    plt.ylim(0,103)
+    plt.ylim(0, 103)
 
     ax.legend(fontsize=6, ncol=4, bbox_to_anchor=(0.45, 1.35), loc="upper center")
-    xxlabel = [val for pair in zip([xx-shift for xx in x[:num_separated_bar]], [xx+shift for xx in x[:num_separated_bar]]) for val in pair]+list(x[num_separated_bar:])
-    plt.xticks(xxlabel, ["P", "D"]*num_separated_bar + [""]*(len(x)-num_separated_bar), fontsize=6)
+    xxlabel = [
+        val
+        for pair in zip(
+            [xx - shift for xx in x[:num_separated_bar]],
+            [xx + shift for xx in x[:num_separated_bar]],
+        )
+        for val in pair
+    ] + list(x[num_separated_bar:])
+    plt.xticks(
+        xxlabel,
+        ["P", "D"] * num_separated_bar + [""] * (len(x) - num_separated_bar),
+        fontsize=6,
+    )
     # ax.set_xticks(ax.get_xticks()[:8])
 
     sec = ax.secondary_xaxis(location=0)
@@ -1290,24 +1343,25 @@ def graph_overall_compare_separate_ratio(
     #         if i==0:
     #             ax.text(i//2-shift, y_offset+6, f'{baseline:.1f}ms', ha='center', weight='bold', fontsize=4.5)
     #         elif i%2==1:
-    #             ax.text(i//2+shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)    
+    #             ax.text(i//2+shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)
     #         else:
     #             ax.text(i//2-shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)
 
     #     else:
-    #         ax.text(i-num_separated_bar, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)    
-
+    #         ax.text(i-num_separated_bar, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)
 
     sec = ax.secondary_xaxis(location=0)
-    sec.set_xticks([0, 2, 5.5, 8], labels=["\n\n"+xl for xl in secondary_xlabel], fontsize=6)
-    # sec.tick_params(bottom = False) 
+    sec.set_xticks(
+        [0, 2, 5.5, 8], labels=["\n\n" + xl for xl in secondary_xlabel], fontsize=6
+    )
+    # sec.tick_params(bottom = False)
     # sec.set_xticklabels([])
     sec.set(xlabel=None)
     sec.tick_params(bottom=False)  # remove the ticks
 
     sec2 = ax.secondary_xaxis(location=0)
     sec2.set_xticks([0.5, 3.5, 7.5, 8.5], labels=[])
-    sec2.tick_params('x', length=25, width=0.8)
+    sec2.tick_params("x", length=25, width=0.8)
     ax.set_xlim(-0.65, 8.5)
 
     major_ticks = np.arange(0, 101, 20)
