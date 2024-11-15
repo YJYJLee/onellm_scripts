@@ -1,24 +1,27 @@
 # %%
 import os
 import re
-import numpy as np
-import matplotlib.pyplot as plt 
-import numpy as np 
-from matplotlib import colormaps
 from statistics import geometric_mean
 
-n_gpu=1
-ns=0
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import colormaps
+
+n_gpu = 1
+ns = 0
 
 # DIR_PREFIX="./onellm_scripts/data_for_paper/compile_graph/"
-DIR_PREFIX="/data/home/yejinlee/RAG/onellm-eval/onellm_scripts/data_for_paper/compile_graph/"
+DIR_PREFIX = (
+    "/data/home/yejinlee/RAG/onellm-eval/onellm_scripts/data_for_paper/compile_graph/"
+)
 
 
-def reject_outliers(data, m=2.):
+def reject_outliers(data, m=2.0):
     d = np.abs(data - np.median(data))
     mdev = np.median(d)
-    s = d / (mdev if mdev else 1.)
-    return [a for i, a in enumerate(data) if s[i] < m ]
+    s = d / (mdev if mdev else 1.0)
+    return [a for i, a in enumerate(data) if s[i] < m]
+
 
 def get_latency(file_path):
     file_path += "/timer_result.txt"
@@ -28,15 +31,15 @@ def get_latency(file_path):
         print("Reading from ", file_path)
         headers = None
         for idx, sl in enumerate(f):
-            if idx==0:
+            if idx == 0:
                 headers = re.sub("\n", "", sl).split("\t")
                 for h in headers:
                     timer_result[h] = list()
             else:
-                if "Total" in sl and idx%2==0:
+                if "Total" in sl and idx % 2 == 0:
                     continue
 
-                slsl = [float(s) for s in re.sub("\n", "", sl).split("\t") if s!=""]
+                slsl = [float(s) for s in re.sub("\n", "", sl).split("\t") if s != ""]
                 for idx, h in enumerate(headers):
                     timer_result[h].append(slsl[idx])
         for k, v in timer_result.items():
@@ -48,6 +51,7 @@ def get_latency(file_path):
     else:
         print("File doesn't exist: " + file_path)
     return timer_result
+
 
 def get_folder(dataset, bs, exp_name):
     if "torch_compile" == exp_name:
@@ -63,53 +67,319 @@ def get_folder(dataset, bs, exp_name):
             chameleon_prefix = "cm3v21_30b_test"
 
     if dataset == "MSCOCO-34B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_to_txt/"+chameleon_prefix+".mn.cm3v21_30b_test.t.coco."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_30b_test.t.coco."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     elif dataset == "Flickr30k-34B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_to_txt/"+chameleon_prefix+".mn.cm3v21_30b_test.t.flickr30k."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_30b_test.t.flickr30k."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     elif dataset == "TextVQA-34B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/"+chameleon_prefix+".mn.cm3v21_30b_test.t.textvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_txt_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_30b_test.t.textvqa."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     elif dataset == "OKVQA-34B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/"+chameleon_prefix+".mn.cm3v21_30b_test.t.okvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_txt_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_30b_test.t.okvqa."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     elif dataset == "Vizwiz-34B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/"+chameleon_prefix+".mn.cm3v21_30b_test.t.vizwiz."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_txt_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_30b_test.t.vizwiz."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     if dataset == "MSCOCO-7B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_to_txt/"+chameleon_prefix+".mn.cm3v21_109m_sft.t.coco."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_109m_sft.t.coco."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     elif dataset == "Flickr30k-7B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_to_txt/"+chameleon_prefix+".mn.cm3v21_109m_sft.t.flickr30k."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_109m_sft.t.flickr30k."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     elif dataset == "TextVQA-7B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/"+chameleon_prefix+".mn.cm3v21_109m_sft.t.textvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_txt_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_109m_sft.t.textvqa."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     elif dataset == "OKVQA-7B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/"+chameleon_prefix+".mn.cm3v21_109m_sft.t.okvqa."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_txt_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_109m_sft.t.okvqa."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     elif dataset == "Vizwiz-7B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/img_txt_to_txt/"+chameleon_prefix+".mn.cm3v21_109m_sft.t.vizwiz."+str(ns)+"_shot.cm3v2_template.mbs."+str(bs)+".umca.True.gm.text.ev.False/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/img_txt_to_txt/"
+            + chameleon_prefix
+            + ".mn.cm3v21_109m_sft.t.vizwiz."
+            + str(ns)
+            + "_shot.cm3v2_template.mbs."
+            + str(bs)
+            + ".umca.True.gm.text.ev.False/"
+        )
     elif dataset == "Coco_Image-34B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_img/"+chameleon_prefix+".mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/txt_to_img/"
+            + chameleon_prefix
+            + ".mn.cm3v21_30b_test.t.coco_image."
+            + str(ns)
+            + "_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."
+            + str(bs)
+            + ".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.coco_image."
+            + str(ns)
+            + "_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        )
     elif dataset == "Coco_Image-7B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_img/"+chameleon_prefix+".mn.cm3v21_109m_sft.t.coco_image."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_109m_sft.t.coco_image."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/txt_to_img/"
+            + chameleon_prefix
+            + ".mn.cm3v21_109m_sft.t.coco_image."
+            + str(ns)
+            + "_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."
+            + str(bs)
+            + ".en.image_gen.g.True/%j/image_gen/mn.cm3v21_109m_sft.t.coco_image."
+            + str(ns)
+            + "_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        )
     elif dataset == "Partiprompts-34B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_img/"+chameleon_prefix+".mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/txt_to_img/"
+            + chameleon_prefix
+            + ".mn.cm3v21_30b_test.t.partiprompts."
+            + str(ns)
+            + "_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."
+            + str(bs)
+            + ".en.image_gen.g.True/%j/image_gen/mn.cm3v21_30b_test.t.partiprompts."
+            + str(ns)
+            + "_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        )
     elif dataset == "Partiprompts-7B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_img/"+chameleon_prefix+".mn.cm3v21_109m_sft.t.partiprompts."+str(ns)+"_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."+str(bs)+".en.image_gen.g.True/%j/image_gen/mn.cm3v21_109m_sft.t.partiprompts."+str(ns)+"_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/txt_to_img/"
+            + chameleon_prefix
+            + ".mn.cm3v21_109m_sft.t.partiprompts."
+            + str(ns)
+            + "_shot.bs.500.c.6.t.1.0.t.0.9.s.1.ncs."
+            + str(bs)
+            + ".en.image_gen.g.True/%j/image_gen/mn.cm3v21_109m_sft.t.partiprompts."
+            + str(ns)
+            + "_shot.usecfg.True.cfg.6.temp.1.0.topp.0.9.seed.1/"
+        )
     # elif dataset == "Hellaswag":
     #     return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_txt/"+chameleon_prefix+".mn.cm3v21_30b_test.t.hellaswag."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
     # elif dataset == "Arc_easy":
     #     return "/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/txt_to_txt/"+chameleon_prefix+".mn.cm3v21_30b_test.t.arc_easy."+str(ns)+"_shot.mbs."+str(bs)+".umca.True.gm.text/"
     elif dataset == "HumanEval-34B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/HumanEval_codellama/meta-llama/CodeLlama-34b-hf/batch_size_"+str(bs)
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/HumanEval_codellama/meta-llama/CodeLlama-34b-hf/batch_size_"
+            + str(bs)
+        )
     elif dataset == "HumanEval-7B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/HumanEval_codellama/meta-llama/CodeLlama-7b-hf/batch_size_"+str(bs)
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/HumanEval_codellama/meta-llama/CodeLlama-7b-hf/batch_size_"
+            + str(bs)
+        )
     elif dataset == "MBPP-34B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/MBPP_codellama/meta-llama/CodeLlama-34b-hf/batch_size_"+str(bs)
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/MBPP_codellama/meta-llama/CodeLlama-34b-hf/batch_size_"
+            + str(bs)
+        )
     elif dataset == "MBPP-7B":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/MBPP_codellama/meta-llama/CodeLlama-7b-hf/batch_size_"+str(bs)
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/MBPP_codellama/meta-llama/CodeLlama-7b-hf/batch_size_"
+            + str(bs)
+        )
     elif dataset == "S2ST":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/"+("batched" if exp_name=="latency_distribution_w_warmup" else "")+"/S2ST/batch_size_"+str(bs)+"/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/"
+            + ("batched" if exp_name == "latency_distribution_w_warmup" else "")
+            + "/S2ST/batch_size_"
+            + str(bs)
+            + "/"
+        )
     elif dataset == "S2TT":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/"+("batched" if exp_name=="latency_distribution_w_warmup" else "")+"/S2TT/batch_size_"+str(bs)+"/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/"
+            + ("batched" if exp_name == "latency_distribution_w_warmup" else "")
+            + "/S2TT/batch_size_"
+            + str(bs)
+            + "/"
+        )
     elif dataset == "T2TT":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/"+("batched" if exp_name=="latency_distribution_w_warmup" else "")+"/T2TT/batch_size_"+str(bs)+"/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/"
+            + ("batched" if exp_name == "latency_distribution_w_warmup" else "")
+            + "/T2TT/batch_size_"
+            + str(bs)
+            + "/"
+        )
     elif dataset == "T2ST":
-        return DIR_PREFIX+"/fsx-atom/yejinlee/paper_submission_results/"+exp_name+"/"+str(n_gpu)+"gpu_1node/"+("batched" if exp_name=="latency_distribution_w_warmup" else "")+"/T2ST/batch_size_"+str(bs)+"/"
+        return (
+            DIR_PREFIX
+            + "/fsx-atom/yejinlee/paper_submission_results/"
+            + exp_name
+            + "/"
+            + str(n_gpu)
+            + "gpu_1node/"
+            + ("batched" if exp_name == "latency_distribution_w_warmup" else "")
+            + "/T2ST/batch_size_"
+            + str(bs)
+            + "/"
+        )
     else:
         print(dataset)
         assert False
@@ -119,7 +389,16 @@ def plot(batch_size_dict):
     baseline = []
 
     for k, bs in batch_size_dict.items():
-        baseline.append(sum([np.average(v) for v in get_latency(get_folder(k, bs, "latency_distribution_w_warmup")).values()]))
+        baseline.append(
+            sum(
+                [
+                    np.average(v)
+                    for v in get_latency(
+                        get_folder(k, bs, "latency_distribution_w_warmup")
+                    ).values()
+                ]
+            )
+        )
 
     # torch_compile_baseline = []
     # for k, bs in batch_size_dict.items():
@@ -129,53 +408,115 @@ def plot(batch_size_dict):
 
     torch_compile = []
     for k, bs in batch_size_dict.items():
-        torch_compile.append(sum([np.average(v) for v in get_latency(get_folder(k, bs, "torch_compile")).values()]))
+        torch_compile.append(
+            sum(
+                [
+                    np.average(v)
+                    for v in get_latency(get_folder(k, bs, "torch_compile")).values()
+                ]
+            )
+        )
 
-    torch_compile = [b/a if a>0 else (2 if a>0 else 0) for a, b in zip(torch_compile, baseline)]
+    torch_compile = [
+        b / a if a > 0 else (2 if a > 0 else 0) for a, b in zip(torch_compile, baseline)
+    ]
 
     torch_compile_autoquant = []
     for k, bs in batch_size_dict.items():
-        torch_compile_autoquant.append(sum([np.average(v) for v in get_latency(get_folder(k, bs, "torch_compile_autoquant")).values()]))
-    torch_compile_autoquant = [b/a if a>0 else (2 if a>0 else 0) for a, b in zip(torch_compile_autoquant, baseline)]
+        torch_compile_autoquant.append(
+            sum(
+                [
+                    np.average(v)
+                    for v in get_latency(
+                        get_folder(k, bs, "torch_compile_autoquant")
+                    ).values()
+                ]
+            )
+        )
+    torch_compile_autoquant = [
+        b / a if a > 0 else (2 if a > 0 else 0)
+        for a, b in zip(torch_compile_autoquant, baseline)
+    ]
 
-    baseline = [b/b if b>0 else 0 for b in baseline]
+    baseline = [b / b if b > 0 else 0 for b in baseline]
 
-    # create data 
-    x = np.arange(len(baseline)) 
+    # create data
+    x = np.arange(len(baseline))
     width = 0.2
 
-    fig, ax = plt.subplots(1, figsize=(10, 6), layout='tight')
+    fig, ax = plt.subplots(1, figsize=(10, 6), layout="tight")
 
-    # plot data in grouped manner of bar type 
-    # plt.bar(x-0.3, baseline, width, color='cyan') 
-    # plt.bar(x-0.1, torch_compile_baseline, width, color='magenta') 
-    # plt.bar(x+0.1, torch_compile, width, color='orange') 
-    # plt.bar(x+0.3, torch_compile_autoquant, width, color='green') 
+    # plot data in grouped manner of bar type
+    # plt.bar(x-0.3, baseline, width, color='cyan')
+    # plt.bar(x-0.1, torch_compile_baseline, width, color='magenta')
+    # plt.bar(x+0.1, torch_compile, width, color='orange')
+    # plt.bar(x+0.3, torch_compile_autoquant, width, color='green')
 
-    # plt.bar(x-0.2, baseline, width, color='cyan') 
-    plt.bar(x-0.1, torch_compile, width, color=colormaps['Set3'].colors[6]) 
-    plt.bar(x+0.1, torch_compile_autoquant, width, color=colormaps['Set3'].colors[4]) 
+    # plt.bar(x-0.2, baseline, width, color='cyan')
+    plt.bar(x - 0.1, torch_compile, width, color=colormaps["Set3"].colors[6])
+    plt.bar(x + 0.1, torch_compile_autoquant, width, color=colormaps["Set3"].colors[4])
 
+    print(
+        "34B torch.compile speedup: ",
+        geometric_mean(
+            [t for idx, t in enumerate(torch_compile) if idx % 2 == 0 and t != 0]
+        ),
+    )
+    print(
+        "7B torch.compile speedup: ",
+        geometric_mean(
+            [t for idx, t in enumerate(torch_compile) if idx % 2 == 1 and t != 0]
+        ),
+    )
 
-    print("34B torch.compile speedup: ", geometric_mean([t for idx, t in enumerate(torch_compile) if idx%2==0 and t!=0]))
-    print("7B torch.compile speedup: ", geometric_mean([t for idx, t in enumerate(torch_compile) if idx%2==1 and t!=0]))
-
-    plt.xticks(x, list(batch_size_dict.keys()), rotation=90) 
-    plt.xlabel("Workloads") 
-    plt.ylabel("Normalized Speedup") 
-    plt.title("Batch Size " +(str(batch_size_dict["MSCOCO-34B"]) if len(set(batch_size_dict.values()))==1 else "max"))
+    plt.xticks(x, list(batch_size_dict.keys()), rotation=90)
+    plt.xlabel("Workloads")
+    plt.ylabel("Normalized Speedup")
+    plt.title(
+        "Batch Size "
+        + (
+            str(batch_size_dict["MSCOCO-34B"])
+            if len(set(batch_size_dict.values())) == 1
+            else "max"
+        )
+    )
     # plt.legend(["Baseline", "Torch.compile Baseline", "Torch.compile", "Torch.compile+Autoquant"],ncol=4)
     # plt.legend(["Baseline", "Torch.compile", "Torch.compile+Autoquant"], ncol=3, bbox_to_anchor=(0.5, 1.15), loc="upper center")
-    plt.legend(["Torch.compile", "Torch.compile+Autoquant"], ncol=2, bbox_to_anchor=(0.5, 1.15), loc="upper center")
-    
+    plt.legend(
+        ["Torch.compile", "Torch.compile+Autoquant"],
+        ncol=2,
+        bbox_to_anchor=(0.5, 1.15),
+        loc="upper center",
+    )
+
     plt.grid(lw=0.2)
 
-    dump_dir = './onellm_scripts/analysis_figures/torch_compile/'
+    dump_dir = "./onellm_scripts/analysis_figures/torch_compile/"
     os.makedirs(dump_dir, exist_ok=True)
 
-    plt.savefig(dump_dir+"batch_size_"+(str(batch_size_dict["MSCOCO-34B"]) if len(set(batch_size_dict.values()))==1 else "max")+".pdf", bbox_inches = 'tight')
-    print("Saving to ", dump_dir+"batch_size_"+(str(batch_size_dict["MSCOCO-34B"]) if len(set(batch_size_dict.values()))==1 else "max")+".pdf")
-    plt.show() 
+    plt.savefig(
+        dump_dir
+        + "batch_size_"
+        + (
+            str(batch_size_dict["MSCOCO-34B"])
+            if len(set(batch_size_dict.values())) == 1
+            else "max"
+        )
+        + ".pdf",
+        bbox_inches="tight",
+    )
+    print(
+        "Saving to ",
+        dump_dir
+        + "batch_size_"
+        + (
+            str(batch_size_dict["MSCOCO-34B"])
+            if len(set(batch_size_dict.values())) == 1
+            else "max"
+        )
+        + ".pdf",
+    )
+    plt.show()
 
 
 # batch_size_dict = {
