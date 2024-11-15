@@ -656,18 +656,50 @@ colormap2 = colormaps["Paired"].colors
 #     "Masked_Select": colormap2[11],
 # }
 
+# Used for paper submission
+# cmap = {
+#     "Embedding": colormap[0],
+#     "Misc": colormap[1],
+#     "Linear": colormap[2],
+#     "LayerNorm": colormap[3],
+#     "Attention": colormap[4],
+#     "Copy": colormap[5],
+#     "Conv1d": colormap2[6],
+#     "Idle": colormap[7],
+#     "KV_Cache_Reorder": colormap[10],
+# }
+
+# Used for rebuttal
+colormap = colormaps["tab10"].colors
+colormap2 = colormaps["Set2"].colors
+colormap3 = colormaps["Set3"].colors
+# colormap3 = colormaps["Set2"].colors
 
 cmap = {
     "Embedding": colormap[0],
-    "Misc": colormap[1],
-    "Linear": colormap[2],
+    "Misc": colormap3[11],
+    "Linear": colormap3[3],
     "LayerNorm": colormap[3],
-    "Attention": colormap[4],
+    "Attention": colormap2[2],
     "Copy": colormap[5],
-    "Conv1d": colormap2[6],
-    "Idle": colormap[7],
-    "KV_Cache_Reorder": colormap[10],
+    "Conv1d": colormap[6],
+    "Idle": colormap3[8],
+    "KV_Cache_Reorder": colormap3[0],
 }
+
+# colormap = colormaps["Accent"].colors
+
+# cmap = {
+#     "Embedding": colormap[0],
+#     "Misc": colormap[1],
+#     "Linear": colormap[2],
+#     "LayerNorm": colormap[4],
+#     "Attention": colormap[5],
+#     "Copy": colormap[6],
+#     "Conv1d": colormap[7],
+#     "Idle": colormap[8],
+#     "KV_Cache_Reorder": colormap[9],
+# }
 
 
 def prep_graph(nested=False):
@@ -1230,15 +1262,20 @@ def graph_overall_compare_separate_ratio(
         print(k)
         for idxidx, vv in enumerate(kernel_breakdown[k]):
             print(xlabel[idxidx])
-            if idxidx<num_separated_bar:
-                value1.append(vv/total_time[idxidx]*100)
-                value2.append(compare_breakdown[k][idxidx]/total_time_compare[idxidx]*100)
+            if idxidx < num_separated_bar:
+                value1.append(vv / total_time[idxidx] * 100)
+                value2.append(
+                    compare_breakdown[k][idxidx] / total_time_compare[idxidx] * 100
+                )
                 value1_real.append(vv)
                 value2_real.append(compare_breakdown[k][idxidx])
                 label1[idxidx] -= shift
                 label2[idxidx] += shift
-                print("Prefill: ", vv/total_time[idxidx]*100)
-                print("Decode: ", compare_breakdown[k][idxidx]/total_time_compare[idxidx]*100)
+                print("Prefill: ", vv / total_time[idxidx] * 100)
+                print(
+                    "Decode: ",
+                    compare_breakdown[k][idxidx] / total_time_compare[idxidx] * 100,
+                )
                 # print("Ratio: ", (vv+compare_breakdown[k][idxidx])/(total_time[idxidx]+total_time_compare[idxidx])*100)
             else:
                 value1.append(0)
@@ -1247,10 +1284,15 @@ def graph_overall_compare_separate_ratio(
                 )
                 value1_real.append(0)
                 value2_real.append(vv)
-                print("Ratio: ", vv/total_time[idxidx]*100 if total_time[idxidx]>0 else 0)
+                print(
+                    "Ratio: ",
+                    vv / total_time[idxidx] * 100 if total_time[idxidx] > 0 else 0,
+                )
 
         ax.bar(label1, value1, bottom=bottom, label=k, color=cmap[k], width=0.35)
         ax.bar(label2, value2, bottom=bottom_compare, color=cmap[k], width=0.35)
+        # ax.bar(label1, value1, bottom=bottom, label=k, width=0.35)
+        # ax.bar(label2, value2, bottom=bottom_compare, width=0.35)
         bottom = np.add(bottom, value1)
         bottom_compare = np.add(bottom_compare, value2)
         bottom_real = np.add(bottom_real, value1_real)
@@ -1271,11 +1313,22 @@ def graph_overall_compare_separate_ratio(
         else:
             times.append(b / baseline)
 
-    plt.ylim(0,103)
+    plt.ylim(0, 103)
 
     ax.legend(fontsize=6, ncol=4, bbox_to_anchor=(0.45, 1.35), loc="upper center")
-    xxlabel = [val for pair in zip([xx-shift for xx in x[:num_separated_bar]], [xx+shift for xx in x[:num_separated_bar]]) for val in pair]+list(x[num_separated_bar:])
-    plt.xticks(xxlabel, ["P", "D"]*num_separated_bar + [""]*(len(x)-num_separated_bar), fontsize=6)
+    xxlabel = [
+        val
+        for pair in zip(
+            [xx - shift for xx in x[:num_separated_bar]],
+            [xx + shift for xx in x[:num_separated_bar]],
+        )
+        for val in pair
+    ] + list(x[num_separated_bar:])
+    plt.xticks(
+        xxlabel,
+        ["P", "D"] * num_separated_bar + [""] * (len(x) - num_separated_bar),
+        fontsize=6,
+    )
     # ax.set_xticks(ax.get_xticks()[:8])
 
     sec = ax.secondary_xaxis(location=0)
@@ -1290,24 +1343,25 @@ def graph_overall_compare_separate_ratio(
     #         if i==0:
     #             ax.text(i//2-shift, y_offset+6, f'{baseline:.1f}ms', ha='center', weight='bold', fontsize=4.5)
     #         elif i%2==1:
-    #             ax.text(i//2+shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)    
+    #             ax.text(i//2+shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)
     #         else:
     #             ax.text(i//2-shift, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)
 
     #     else:
-    #         ax.text(i-num_separated_bar, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)    
-
+    #         ax.text(i-num_separated_bar, y_offset, f'{times[i]:.1f}x', ha='center', weight='bold', fontsize=4.5)
 
     sec = ax.secondary_xaxis(location=0)
-    sec.set_xticks([0, 2, 5.5, 8], labels=["\n\n"+xl for xl in secondary_xlabel], fontsize=6)
-    # sec.tick_params(bottom = False) 
+    sec.set_xticks(
+        [0, 2, 5.5, 8], labels=["\n\n" + xl for xl in secondary_xlabel], fontsize=6
+    )
+    # sec.tick_params(bottom = False)
     # sec.set_xticklabels([])
     sec.set(xlabel=None)
     sec.tick_params(bottom=False)  # remove the ticks
 
     sec2 = ax.secondary_xaxis(location=0)
     sec2.set_xticks([0.5, 3.5, 7.5, 8.5], labels=[])
-    sec2.tick_params('x', length=25, width=0.8)
+    sec2.tick_params("x", length=25, width=0.8)
     ax.set_xlim(-0.65, 8.5)
 
     major_ticks = np.arange(0, 101, 20)
@@ -2921,82 +2975,57 @@ else:
         for file_path in [
             path for path in glob.glob(args.json_folder + "/profile_sample_*")
         ]:
-            if "txt_to_img" in file_path:
-                _sample_breakdown = dict()
-                for i in range(64, 1088, 64):
-                    profile_result = parse_file(
-                        file_path,
-                        plot_graph=False,
-                    )
-                    gather_result_separate(
-                        profile_result, _sample_breakdown, merge_sample=True
-                    )
-                    # print(">>>> : ", _sample_breakdown)
+            # if "t2i" in file_path:
+            #     sample_id = 500
+            #     _sample_breakdown = dict()
+            #     # for i in range(64, 1088, 64):
+            #     for i in range(64, 129, 64):
+            #         profile_result = parse_file(
+            #             file_path
+            #             + "profile_sample_"
+            #             + str(sample_id)
+            #             + "_"
+            #             + str(i)
+            #             + "_gpu_0.json",
+            #             file_path,
+            #             plot_graph=False,
+            #         )
+            #         gather_result_separate(
+            #             profile_result, _sample_breakdown, merge_sample=True
+            #         )
 
-                profile_result = parse_file(
-                    file_path,
-                    plot_graph=False,
-                )
-                for k, v in profile_result.items():
-                    if k not in _sample_breakdown:
-                        profile_result[k] = [0] * 1023 + v
-                gather_result_separate(
-                    profile_result, _sample_breakdown, merge_sample=True
-                )
+            #     gather_result_separate(_sample_breakdown, sample_breakdown)
+            #     print(sample_breakdown)
+            #     import pdb
 
-                gather_result_separate(_sample_breakdown, sample_breakdown)
-                # print("FINAL: ", sample_breakdown)
-            else:
+            #     pdb.set_trace()
+            #     exit(0)
+
+            # else:
+            try:
                 profile_result = parse_file(file_path, plot_graph=False)
                 # profile_result = {'(Preprocessing) Encode Image': [15.238000000000008, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'Misc': [8.823000000000006, 0.43800000000000033, 0.4280000000000003, 0.43200000000000033, 0.4270000000000003, 0.4230000000000003, 0.4230000000000003, 0.4250000000000003, 0.43300000000000033, 0.43400000000000033], 'LayerNorm': [12.997999999999998, 3.6359999999999952, 3.5939999999999954, 3.5929999999999964, 3.5909999999999953, 3.5889999999999964, 3.584999999999997, 3.5929999999999964, 3.586999999999996, 3.5989999999999958], 'Copy': [0.352, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004, 0.004], 'Scoring': [0.06300000000000001, 0.08300000000000002, 0.08200000000000002, 0.08100000000000002, 0.08300000000000003, 0.08200000000000002, 0.08100000000000002, 0.08500000000000002, 0.08300000000000002, 0.08500000000000002], 'Linear': [315.8960000000001, 40.487999999999936, 40.42199999999994, 40.40599999999994, 40.48999999999995, 40.45299999999991, 40.40899999999992, 40.46499999999993, 40.48299999999995, 40.487999999999914], 'Embedding': [0.092, 0.004, 0.003, 0.004, 0.003, 0.003, 0.003, 0.003, 0.003, 0.003], 'Attention': [26.062999999999988, 6.31099999999998, 6.221999999999979, 6.220999999999983, 6.248999999999979, 6.246999999999986, 6.252999999999983, 6.2619999999999845, 6.259999999999983, 6.255999999999982], 'Idle': [-9.727000000000032, 97.79900000000009, 92.46100000000007, 103.96900000000008, 90.72800000000007, 83.71700000000011, 107.91000000000008, 97.30100000000007, 98.40400000000008, 106.65400000000011]}
                 for idle in profile_result["Idle"]:
                     assert idle >= 0, idle
                 gather_result_separate(profile_result, sample_breakdown)
-
-        prefill_breakdown = dict()
-        decode_breakdown = dict()
-        print(sample_breakdown)
+            except:
+                print("????")
+                pass
         for k, v in sample_breakdown.items():
-            prefill_breakdown[k] = np.average([vv[0] for vv in v])
-            decode_breakdown[k] = np.average([sum(vv[1:]) for vv in v])
+            print(k, np.average([vv[0] for vv in v]))
 
-        for k, v in prefill_overall_breakdown.items():
-            if k in sample_breakdown:
-                prefill_overall_breakdown[k].append(prefill_breakdown[k])
-            else:
-                prefill_overall_breakdown[k].append(0)
+        # prefill_breakdown = dict()
+        # decode_breakdown = dict()
+        # for k, v in sample_breakdown.items():
+        #     prefill_breakdown[k] = np.average([vv[0] for vv in v])
+        #     decode_breakdown[k] = np.average([sum(vv[1:]) for vv in v])
 
-        for k, v in decode_overall_breakdown.items():
-            if k in sample_breakdown:
-                decode_overall_breakdown[k].append(decode_breakdown[k])
-            else:
-                decode_overall_breakdown[k].append(0)
-
-        if "1gpu_1node" in args.json_folder:
-            if "Communication" in prefill_breakdown:
-                del prefill_overall_breakdown["Communication"]
-            if "Communication" in decode_overall_breakdown:
-                del decode_overall_breakdown["Communication"]
-
-        del_keys = list()
-        for k, v in prefill_overall_breakdown.items():
-            if (
-                sum(v) == 0
-                and k in decode_overall_breakdown
-                and sum(decode_overall_breakdown[k]) == 0
-            ):
-                del_keys.append(k)
-
-        for k in del_keys:
-            del prefill_overall_breakdown[k]
-            del decode_overall_breakdown[k]
-
-        print("Prefill")
-        for k, v in prefill_overall_breakdown.items():
-            print(k, v[0].item())
-        print("Decode")
-        for k, v in decode_overall_breakdown.items():
-            print(k, v[0].item())
+        # print("Prefill")
+        # for k, v in prefill_breakdown.items():
+        #     print(k, v)
+        # print("Decode")
+        # for k, v in decode_breakdown.items():
+        #     print(k, v)
 
     else:
         # if args.json_file:
